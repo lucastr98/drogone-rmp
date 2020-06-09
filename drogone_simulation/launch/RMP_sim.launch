@@ -1,0 +1,20 @@
+<launch>
+    <arg name="mav_name" default="peregrine"/>
+    <arg name="log_file" default="$(arg mav_name)" />
+
+    <!-- launch simulation (rviz and gazebo) -->
+    <include file="$(find drogone_simulation)/launch/simulationMPC.launch">
+      <arg name="mav_name" value="$(arg mav_name)"/>
+    </include>
+
+    <!-- launch motion planner -->
+    <include file="$(find drogone_motion_planner)/launch/drogone_rmp_planner.launch">
+      <arg name="mav_name" value="$(arg mav_name)"/>
+    </include>
+
+    <!-- launch finite state machine -->
+    <include file="$(find drogone_fsm)/launch/FSM.launch">
+      <arg name="mav_name" value="$(arg mav_name)"/>
+    </include>
+
+</launch>

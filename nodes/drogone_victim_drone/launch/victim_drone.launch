@@ -1,0 +1,7 @@
+<launch>
+  <group>
+
+    <node name="victim_drone" pkg="victim_drone" type="victim_drone.py" output="screen"/>
+
+  </group>
+</launch>

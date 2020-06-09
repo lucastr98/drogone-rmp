@@ -1,0 +1,13 @@
+<launch>
+    <arg name="mav_name" default="peregrine"/>
+
+    <group ns="$(arg mav_name)">
+
+        <node name="rmp_planner" pkg="drogone_motion_planner" type="rmp_planner_node" output="screen">
+            <remap from="uav_pose" to="odometry_sensor1/odometry"/>
+            <remap from="victim_trajectory" to="ground_truth_tracker"/>
+        </node>
+
+    </group>
+
+</launch>

@@ -1,0 +1,11 @@
+<launch>
+  <arg name="mav_name" default="peregrine"/>
+
+  <group ns="$(arg mav_name)">
+
+    <node name="action_state" pkg="drogone_fsm" type="ActionState_Simulation.py" output="screen"/>
+    <node name="gui_simulation" pkg="drogone_fsm" type="GUI_Simulation.py" output="screen"/>
+
+  </group>
+
+</launch>

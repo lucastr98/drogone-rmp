@@ -1,0 +1,2 @@
+# horizontal (x,y) and vertical (z) distance Threshold for distance between DroGone drone and victim drone such that victim drone is caught.
+distances: [0.6, 0.25]

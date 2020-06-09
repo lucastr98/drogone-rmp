@@ -1,0 +1,9 @@
+#define Goal
+string new_mode
+bool finalcmd
+---
+#define Result
+string status
+---
+#define Feedback
+bool feedback
