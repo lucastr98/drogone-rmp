@@ -24,6 +24,8 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     // publisher for trajectory to drone
     u_v_pub_ = nh_.advertise<drogone_msgs_rmp::CameraUV>("/u_v", 0);
 
+    f_u_v_pub_ = nh.advertise<drogone_msgs_rmp::AccFieldUV>("/f_u_v", 0);
+
     // subscriber for Odometry from drone
     sub_odom_ =
         nh.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
@@ -73,7 +75,7 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
   old_stamp_ = odom->header.stamp.sec + odom->header.stamp.nsec/1e9;
 }
 
-Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use_odom){
+Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use_odom, bool is_vel){
   // camera frame has  x in the horizontal, y in the vertical and z out of the camera
   // define roll, pitch, yaw angles of the camera coordinates w.r.t. the body coordinates
   double roll_C_B, pitch_C_B, yaw_C_B;
@@ -96,9 +98,9 @@ Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use
     q.w() * q.w() - q.x() * q.x() - q.y() * q.y() + q.z() * q.z());
   }
   else{
-    roll_B_W = future_roll_;
-    pitch_B_W = future_pitch_;
-    yaw_B_W = future_yaw_;
+    roll_B_W = cur_roll_;
+    pitch_B_W = cur_pitch_;
+    yaw_B_W = cur_yaw_;
   }
 
   // define translational offset of the body from world origin
@@ -107,7 +109,7 @@ Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use
     t_B_W = uav_state_.position;
   }
   else{
-    t_B_W = future_pos_;
+    t_B_W = cur_pos_;
   }
 
   // define Rotation matrices
@@ -133,23 +135,29 @@ Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use
             cos(roll_B_W) * sin(pitch_B_W) * sin(yaw_B_W) - sin(roll_B_W) * cos(yaw_B_W),
             cos(roll_B_W) * cos(pitch_B_W);
 
-  // define translational parts of Transformation matrices
-  Eigen::Vector3d trans_C_B = -R_C_B * t_C_B;
-  Eigen::Vector3d trans_B_W = -R_B_W * t_B_W;
+  Eigen::Vector3d target_C;
 
-  // define Transformation matrices
-  Eigen::Matrix4d M_C_B, M_B_W;
-  Eigen::Affine3d T_C_B, T_B_W;
+  if(!is_vel){
+    // define translational parts of Transformation matrices
+    Eigen::Vector3d trans_C_B = -R_C_B * t_C_B;
+    Eigen::Vector3d trans_B_W = -R_B_W * t_B_W;
 
-  M_C_B.setIdentity();
-  M_C_B.block<3, 3>(0, 0) = R_C_B;
-  M_C_B.block<3, 1>(0, 3) = trans_C_B;
-  T_C_B = M_C_B;
+    // define Transformation matrices
+    Eigen::Affine3d T_C_B, T_B_W;
+    T_C_B.linear() = R_C_B;
+    T_C_B.translation() = trans_C_B;
+    T_B_W.linear() = R_B_W;
+    T_B_W.translation() = trans_B_W;
 
-  M_B_W.setIdentity();
-  M_B_W.block<3, 3>(0, 0) = R_B_W;
-  M_B_W.block<3, 1>(0, 3) = trans_B_W;
-  T_B_W = M_B_W;
+    // calculate target pose in camera frame
+    Eigen::Affine3d target_pose_W, target_pose_C;
+    target_pose_W.translation() = target;
+    target_pose_C = T_C_B * T_B_W * target_pose_W;
+    target_C = target_pose_C.translation();
+  }
+  else{
+    target_C = R_C_B * R_B_W * target;
+  }
 
   // set up camera matrix
   Eigen::MatrixXd K = Eigen::MatrixXd::Zero(3, 3);
@@ -159,14 +167,17 @@ Eigen::Matrix<double, 2, 1> RMPPlanner::get_u_v(Eigen::Vector3d target, bool use
   K(0, 2) = u_0_;
   K(1, 2) = v_0_;
 
-  // convert the target position in world to camera
-  Eigen::Vector3d target_W = target;
-  Eigen::Vector3d target_C;
-  target_C = T_C_B * T_B_W * target_W;
-
   // get u, v from camera matrix and target position in camera frame
   Eigen::Vector3d u_v;
   u_v = K * target_C;
+
+  // take normalization from u_v position
+  if(!is_vel){
+    normalize_u_v_ = u_v[2];
+  }
+  else{
+    u_v[2] = normalize_u_v_;
+  }
 
   // normalize u and v
   Eigen::Matrix<double, 2, 1> u_v_normalized;
@@ -295,21 +306,18 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
   // set current position in Q jacobian calculation
   task_space_geometry.setQ(pos);
 
-  Eigen::Matrix<double, task_space_dimension, 1> u_v, u_v_old, u_v_dot;
+  Eigen::Matrix<double, task_space_dimension, 1> u_v, u_v_old, u_v_dot, f_u_v;
   // integrate until drone is at rest and store pos, vel & acc in msg
-  int counter = 0;
+
   while(!integrator.isDone()){
     if(t == 0){
       // set X in the integrator (u and v)
       bool use_odom = true;
-      u_v = get_u_v(target_pos, use_odom);
-      u_v_dot = get_u_v(target_vel, use_odom);
-
-      drogone_msgs_rmp::CameraUV msg;
-      msg.u = u_v[0];
-      msg.v = u_v[1];
-      msg.header.stamp = ros::Time(t);
-      u_v_pub_.publish(msg);
+      bool is_vel = false;
+      u_v = get_u_v(target_pos, use_odom, is_vel);
+      use_odom = true;
+      is_vel = true;
+      u_v_dot = get_u_v(target_vel, use_odom, is_vel);
 
       integrator.setX(u_v, u_v_dot);
     }
@@ -317,25 +325,43 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
       // update Q in the Jacobian
       task_space_geometry.setQ(traj_pos);
 
-      // update u and v in integrator
-      calc_future_state(traj_pos, traj_acc);
-      bool use_odom = false;
-      u_v_old = u_v;
-      u_v = get_u_v(target_pos, use_odom);
-      u_v_dot = (u_v - u_v_old) / dt;
-      // u_v_dot = get_u_v(target_vel, use_odom);
+      // update current state for calculation of u and v
+      update_cur_state(traj_pos, traj_acc);
 
-      drogone_msgs_rmp::CameraUV msg;
-      msg.u = u_v[0];
-      msg.v = u_v[1];
-      msg.header.stamp = ros::Time(t);
-      u_v_pub_.publish(msg);
+      // calculate u and v
+      bool use_odom = false;
+      bool is_vel = false;
+      u_v = get_u_v(target_pos, use_odom, is_vel);
+
+      // calculate relative velocity
+      Eigen::Vector3d relative_vel, cur_vel;
+      cur_vel[0] = traj_vel[0];
+      cur_vel[1] = traj_vel[1];
+      cur_vel[2] = traj_vel[2];
+      relative_vel = target_vel - cur_vel;
+
+      // calculate u_dot and v_dot with current velocity
+      use_odom = false;
+      is_vel = true;
+      u_v_dot = get_u_v(relative_vel, use_odom, is_vel);
 
       integrator.setX(u_v, u_v_dot);
     }
     integrator.forwardIntegrate(dt);
     integrator.getState(&traj_pos, &traj_vel, &traj_acc);
     this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
+
+    f_u_v = target_policy.getAccField();
+    drogone_msgs_rmp::AccFieldUV msg;
+    msg.f_u = f_u_v[0];
+    msg.f_v = f_u_v[1];
+    msg.x_u = u_v[0];
+    msg.x_v = u_v[1];
+    msg.x_dot_u = u_v_dot[0];
+    msg.x_dot_v = u_v_dot[1];
+    msg.header.stamp = ros::Time(t);
+    f_u_v_pub_.publish(msg);
+
     t += dt;
   }
 
@@ -391,27 +417,30 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
   msg->points.push_back(trajectory_point_msg);
 }
 
-void RMPPlanner::calc_future_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc){
+void RMPPlanner::update_cur_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc){
   double yaw = pos[3];
 
   double a_x_B = acc[0] * cos(yaw) + acc[1] * sin(yaw);
   double a_y_B = acc[1] * cos(yaw) - acc[0] * sin(yaw);
   double a_z_B = acc[2];
 
-  // double roll = atan2(a_y_B, a_z_B + 9.81);
-  // double pitch = atan2(a_x_B, a_z_B + 9.81);
-  double roll = 0;
-  double pitch = 0;
+  double roll = atan2(a_y_B, a_z_B + 9.81);
+  double pitch = atan2(a_x_B, a_z_B + 9.81);
+  // double roll = 0;
+  // double pitch = 0;
   // ROS_WARN_STREAM(roll * 180 / M_PI);
   // ROS_WARN_STREAM(pitch * 180 / M_PI);
   // ROS_WARN_STREAM(" ");
 
-  future_roll_ = roll;
-  future_pitch_ = pitch;
-  future_yaw_ = yaw;
-  future_pos_[0] = pos[0];
-  future_pos_[1] = pos[1];
-  future_pos_[2] = pos[2];
+  std::cout << "pitch:        " << pitch * 180 / M_PI << std::endl;
+  std::cout << "x-pos:        " << pos[0] << std::endl;
+
+  cur_roll_ = roll;
+  cur_pitch_ = pitch;
+  cur_yaw_ = yaw;
+  cur_pos_[0] = pos[0];
+  cur_pos_[1] = pos[1];
+  cur_pos_[2] = pos[2];
 }
 
 bool RMPPlanner::Land(){

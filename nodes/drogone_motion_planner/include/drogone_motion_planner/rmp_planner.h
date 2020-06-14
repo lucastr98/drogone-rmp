@@ -12,6 +12,7 @@
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <rmpcpp/eval/trapezoidal_integrator.h>
 #include <drogone_msgs_rmp/CameraUV.h>
+#include <drogone_msgs_rmp/AccFieldUV.h>
 
 namespace drogone_rmp_planner {
 
@@ -30,7 +31,7 @@ class RMPPlanner{
     RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private);
 
     void uavOdomCallback(const nav_msgs::Odometry::ConstPtr& pose);
-    Eigen::Matrix<double, 2, 1> get_u_v(Eigen::Vector3d target, bool use_odom); // Eigen::Quaterniond q);
+    Eigen::Matrix<double, 2, 1> get_u_v(Eigen::Vector3d target, bool use_odom, bool is_vel); // Eigen::Quaterniond q);
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
@@ -41,7 +42,7 @@ class RMPPlanner{
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
     void create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos, Eigen::Matrix<double, 4, 1> traj_vel,
                                      Eigen::Matrix<double, 4, 1> traj_acc, trajectory_msgs::MultiDOFJointTrajectory *msg);
-    void calc_future_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc);
+    void update_cur_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc);
 
   protected:
     actionlib::SimpleActionServer<drogone_action_rmp::FSMAction> as_;
@@ -52,6 +53,7 @@ class RMPPlanner{
     ros::Publisher trajectory_pub_;
     ros::Publisher pose_pub_;
     ros::Publisher u_v_pub_;
+    ros::Publisher f_u_v_pub_;
     ros::Subscriber sub_odom_;
     ros::Subscriber sub_follow_;
 
@@ -71,13 +73,15 @@ class RMPPlanner{
     double v_0_;
 
     // roll pitch yaw
-    double future_roll_;
-    double future_pitch_;
-    double future_yaw_;
-    Eigen::Vector3d future_pos_;
+    double cur_roll_;
+    double cur_pitch_;
+    double cur_yaw_;
+    Eigen::Vector3d cur_pos_;
 
     double accuracy_ = 0.3;
     bool stop_sub_;
+
+    double normalize_u_v_;
 };
 
 } // namespace drogone_motion_planning
