@@ -193,7 +193,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << 0.0, 0.0, 4.0;
+  take_off_pos << 0.0, 0.0, 10.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -255,8 +255,8 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
   target[1] = 0;
   double alpha, beta, c;
   alpha = 1.0;
-  beta = 2.0;
-  c = 0.005;
+  beta = 3.0;
+  c = 0.05;
   rmpcpp::SimpleTargetPolicy<task_space_dimension> target_policy(target, alpha, beta, c);
 
   // create a metric a for the target policy
@@ -371,7 +371,7 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
   trajectory_msg.header.stamp = ros::Time::now();
   trajectory_pub_.publish(trajectory_msg);
 
-  ros::Duration(20.0).sleep();
+  ros::Duration(t).sleep();
   stop_sub_ = true;
 }
 
