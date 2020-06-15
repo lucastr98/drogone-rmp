@@ -14,6 +14,8 @@
 #include <drogone_msgs_rmp/CameraUV.h>
 #include <drogone_msgs_rmp/AccFieldUV.h>
 
+#include <chrono>
+
 namespace drogone_rmp_planner {
 
 struct UAVState {
@@ -32,6 +34,7 @@ class RMPPlanner{
 
     void uavOdomCallback(const nav_msgs::Odometry::ConstPtr& pose);
     Eigen::Matrix<double, 2, 1> get_u_v(Eigen::Vector3d target, bool use_odom, bool is_vel); // Eigen::Quaterniond q);
+    void publish_u_v_viz_msg(Eigen::Matrix<double, 2, 1> f_u_v, Eigen::Matrix<double, 2, 1> u_v, Eigen::Matrix<double, 2, 1> u_v_dot, double t);
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
@@ -82,6 +85,10 @@ class RMPPlanner{
     bool stop_sub_;
 
     double normalize_u_v_;
+
+    // analyze computational time
+    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t1_;
+    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t2_;
 };
 
 } // namespace drogone_motion_planning

@@ -290,6 +290,7 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
   trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
   double dt = 0.01;
   double t = 0;
+  double MPC_horizon = 2.0;
   Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
 
   // set K matrix elements for jacobian calculation
@@ -309,70 +310,67 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
   Eigen::Matrix<double, task_space_dimension, 1> u_v, u_v_old, u_v_dot, f_u_v;
   // integrate until drone is at rest and store pos, vel & acc in msg
 
-  while(!integrator.isDone()){
-    if(t == 0){
-      // set X in the integrator (u and v)
-      bool use_odom = true;
-      bool is_vel = false;
+
+  double xy_distance = sqrt((target_pos - uav_state_.position)[0] * (target_pos - uav_state_.position)[0] +
+                            (target_pos - uav_state_.position)[1] * (target_pos - uav_state_.position)[1]);
+  if(xy_distance > 0.01){
+    // integrate 2s into the future
+    for(double t = 0.0; t <= MPC_horizon + dt; t += dt){
+      bool use_odom, is_vel;
+      Eigen::Vector3d relative_vel;
+      if(t == 0){
+        use_odom = true;
+        relative_vel = target_vel - uav_state_.velocity;
+      }
+      else{
+        // update Q in the Jacobian
+        task_space_geometry.setQ(traj_pos);
+
+        // update current state for calculation of u and v
+        update_cur_state(traj_pos, traj_acc);
+
+        // calculate u and v
+        use_odom = false;
+
+        // calculate relative velocity
+        Eigen::Vector3d cur_vel;
+        cur_vel[0] = traj_vel[0];
+        cur_vel[1] = traj_vel[1];
+        cur_vel[2] = traj_vel[2];
+        relative_vel = target_vel - cur_vel;
+      }
+
+      is_vel = false;
       u_v = get_u_v(target_pos, use_odom, is_vel);
-      use_odom = true;
       is_vel = true;
       u_v_dot = get_u_v(target_vel, use_odom, is_vel);
 
       integrator.setX(u_v, u_v_dot);
+      integrator.forwardIntegrate(dt);
+      integrator.getState(&traj_pos, &traj_vel, &traj_acc);
+      this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
+      this->publish_u_v_viz_msg(target_policy.getAccField(), u_v, u_v_dot, t);
     }
-    else{
-      // update Q in the Jacobian
-      task_space_geometry.setQ(traj_pos);
 
-      // update current state for calculation of u and v
-      update_cur_state(traj_pos, traj_acc);
-
-      // calculate u and v
-      bool use_odom = false;
-      bool is_vel = false;
-      u_v = get_u_v(target_pos, use_odom, is_vel);
-
-      // calculate relative velocity
-      Eigen::Vector3d relative_vel, cur_vel;
-      cur_vel[0] = traj_vel[0];
-      cur_vel[1] = traj_vel[1];
-      cur_vel[2] = traj_vel[2];
-      relative_vel = target_vel - cur_vel;
-
-      // calculate u_dot and v_dot with current velocity
-      use_odom = false;
-      is_vel = true;
-      u_v_dot = get_u_v(relative_vel, use_odom, is_vel);
-
-      integrator.setX(u_v, u_v_dot);
-    }
-    integrator.forwardIntegrate(dt);
-    integrator.getState(&traj_pos, &traj_vel, &traj_acc);
-    this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
-
-    f_u_v = target_policy.getAccField();
-    drogone_msgs_rmp::AccFieldUV msg;
-    msg.f_u = f_u_v[0];
-    msg.f_v = f_u_v[1];
-    msg.x_u = u_v[0];
-    msg.x_v = u_v[1];
-    msg.x_dot_u = u_v_dot[0];
-    msg.x_dot_v = u_v_dot[1];
-    msg.header.stamp = ros::Time(t);
-    f_u_v_pub_.publish(msg);
-
-    t += dt;
+    // publish trajectory
+    trajectory_msg.header.stamp = ros::Time::now();
+    trajectory_pub_.publish(trajectory_msg);
   }
+  else{
+    stop_sub_ = true;
+  }
+}
 
-  ROS_WARN_STREAM(t);
-
-  // publish trajectory
-  trajectory_msg.header.stamp = ros::Time::now();
-  trajectory_pub_.publish(trajectory_msg);
-
-  ros::Duration(t).sleep();
-  stop_sub_ = true;
+void RMPPlanner::publish_u_v_viz_msg(Eigen::Matrix<double, 2, 1> f_u_v, Eigen::Matrix<double, 2, 1> u_v, Eigen::Matrix<double, 2, 1> u_v_dot, double t){
+  drogone_msgs_rmp::AccFieldUV msg;
+  msg.f_u = f_u_v[0];
+  msg.f_v = f_u_v[1];
+  msg.x_u = u_v[0];
+  msg.x_v = u_v[1];
+  msg.x_dot_u = u_v_dot[0];
+  msg.x_dot_v = u_v_dot[1];
+  msg.header.stamp = ros::Time(t);
+  f_u_v_pub_.publish(msg);
 }
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos, Eigen::Matrix<double, 4, 1> traj_vel,
@@ -424,16 +422,16 @@ void RMPPlanner::update_cur_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix
   double a_y_B = acc[1] * cos(yaw) - acc[0] * sin(yaw);
   double a_z_B = acc[2];
 
-  double roll = atan2(a_y_B, a_z_B + 9.81);
-  double pitch = atan2(a_x_B, a_z_B + 9.81);
-  // double roll = 0;
-  // double pitch = 0;
+  // double roll = atan2(a_y_B, a_z_B + 9.81);
+  // double pitch = atan2(a_x_B, a_z_B + 9.81);
+  double roll = 0;
+  double pitch = 0;
   // ROS_WARN_STREAM(roll * 180 / M_PI);
   // ROS_WARN_STREAM(pitch * 180 / M_PI);
   // ROS_WARN_STREAM(" ");
 
-  std::cout << "pitch:        " << pitch * 180 / M_PI << std::endl;
-  std::cout << "x-pos:        " << pos[0] << std::endl;
+  // std::cout << "pitch:        " << pitch * 180 / M_PI << std::endl;
+  // std::cout << "x-pos:        " << pos[0] << std::endl;
 
   cur_roll_ = roll;
   cur_pitch_ = pitch;
