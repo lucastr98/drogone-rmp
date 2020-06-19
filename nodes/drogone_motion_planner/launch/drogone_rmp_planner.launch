@@ -5,7 +5,8 @@
 
         <node name="rmp_planner" pkg="drogone_motion_planner" type="rmp_planner_node" output="screen">
             <remap from="uav_pose" to="odometry_sensor1/odometry"/>
-            <remap from="victim_trajectory" to="ground_truth_tracker"/>
+            <remap from="victim_pos" to="target_detection"/>
+            <rosparam command="load" file="$(find drogone_motion_planner)/cfg/$(arg mav_name)_planner_params.yaml"/>
         </node>
 
     </group>

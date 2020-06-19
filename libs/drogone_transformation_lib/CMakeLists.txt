@@ -7,7 +7,7 @@ catkin_simple(ALL_DEPS_REQUIRED)
 add_definitions(-std=c++17 -Wall -Wextra)
 
 cs_add_library(${PROJECT_NAME}
-  src/world_to_camera.cpp
+  src/transformations.cpp
 )
 
 cs_install()

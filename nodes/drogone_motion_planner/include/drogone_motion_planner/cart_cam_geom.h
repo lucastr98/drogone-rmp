@@ -79,19 +79,6 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
   virtual void convertToX(const typename base::VectorQ &q, typename base::VectorX *x,
                           const VectorQ &q_dot = VectorQ::Zero(),
                           VectorX *x_dot = nullptr) const {
-    // // u
-    // x->x() = 1 / (target_pos_[2] - q[2]) *
-    //          (f_x_ * ((target_pos_[0] - q[0]) * cos(q[3]) + (target_pos_[1] - q[1]) * sin(q[3])) +
-    //           u_0_ * (target_pos_[2] - q[2]));
-    //
-    // // v
-    // x->y() = 1 / (target_pos_[2] - q[2]) *
-    //          (f_y_ * ((q[0] - target_pos_[0]) * sin(q[3]) + (target_pos_[1] - q[1]) * cos(q[3])) +
-    //           v_0_ * (target_pos_[2] - q[2]));
-    //
-    // if (x_dot != nullptr) {
-    //   *x_dot = J(*x, VectorX::Zero()) * q_dot;
-    // }
 
     ACK_UNUSED(x);
     ACK_UNUSED(x_dot);
@@ -102,16 +89,6 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
   }
 
   virtual void convertToQ(const typename base::VectorX &x, typename base::VectorQ *q) const {
-    // // Standard formula for cylindrical coordinates
-    //
-    // // x
-    // q->x() = x.x() * cos(x.y());
-    //
-    // // y
-    // q->y() = x.x() * sin(x.y());
-    //
-    // // z
-    // q->z() = x.z();
 
     ACK_UNUSED(x);
     ACK_UNUSED(q);

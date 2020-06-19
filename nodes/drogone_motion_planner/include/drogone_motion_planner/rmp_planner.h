@@ -11,7 +11,8 @@
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <rmpcpp/eval/trapezoidal_integrator.h>
-#include <drogone_msgs_rmp/CameraUV.h>
+#include <drogone_msgs_rmp/target_detection.h>
+#include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldUV.h>
 
 namespace drogone_rmp_planner {
@@ -36,7 +37,7 @@ class RMPPlanner{
 
     bool TakeOff();
     bool Follow();
-    void follow_callback(const trajectory_msgs::MultiDOFJointTrajectory& victim_traj);
+    void follow_callback(const drogone_msgs_rmp::target_detection& victim_pos);
     bool Land();
 
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
@@ -65,7 +66,9 @@ class RMPPlanner{
     bool first_odom_cb_;
     double old_stamp_;
 
-    // camera matrix elements
+    // camera constraints
+    drogone_transformation_lib::PinholeConstants pinhole_constants_;
+    drogone_transformation_lib::CameraMounting camera_mounting_;
     double f_x_;
     double f_y_;
     double u_0_;

@@ -8,7 +8,7 @@ DummyDetector::DummyDetector(ros::NodeHandle nh, ros::NodeHandle nh_private):
   old_stamp_(0.0) {
 
     // publisher for (u, v)
-    pub_u_v_ = nh_.advertise<drogone_msgs_rmp::CameraUV>("u_v", 0);
+    pub_detection_ = nh_.advertise<drogone_msgs_rmp::target_detection>("target_detection", 0);
 
     // subscriber for Odometry from drone
     sub_odom_ = nh_.subscribe("uav_pose", 1, &DummyDetector::uavOdomCallback, this);
@@ -38,6 +38,13 @@ DummyDetector::DummyDetector(ros::NodeHandle nh, ros::NodeHandle nh_private):
     }
     if(!nh_private_.getParam("yaw", camera_mounting_.yaw)){
       ROS_ERROR("failed to load yaw");
+    }
+
+    if(!nh_private_.getParam("w", w_)){
+      ROS_ERROR("failed to load w");
+    }
+    if(!nh_private_.getParam("h", h_)){
+      ROS_ERROR("failed to load h");
     }
 
     std::vector<double> cam_trans;
@@ -85,23 +92,36 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   Eigen::Vector3d target_pos_W;
   tf::vectorMsgToEigen(victim_traj.points[0].transforms[0].translation, target_pos_W);
 
+  ROS_WARN_STREAM(target_pos_W);
+
+  // check if point is in fov before transforming
+  double fov_x = 2 * atan2(w_, 2 * pinhole_constants_.f_x);
+  double fov_y = 2 * atan2(h_, 2 * pinhole_constants_.f_y);
+  double angle_x = atan2(target_pos_W[0] - uav_state_.position[0], target_pos_W[2] - uav_state_.position[2]);
+  double angle_y = atan2(target_pos_W[1] - uav_state_.position[1], target_pos_W[2] - uav_state_.position[2]);
+  if(abs(angle_x) > fov_x / 2 || abs(angle_y) > fov_y / 2){
+    ROS_WARN_STREAM("DUMMY DETECTOR ----- TARGET NOT IN FOV");
+    return;
+  }
+
   // calculate (u, v)
-  drogone_transformation_lib::WorldToCamera transformer(pinhole_constants_, camera_mounting_);
   Eigen::Affine3d uav_pose;
   uav_pose.translation() = uav_state_.position;
   uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
-  Eigen::Matrix<double, 2, 1> u_v = transformer.get_u_v(target_pos_W, uav_pose).first;
+  drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
+  Eigen::Matrix<double, 3, 1> detection = transformer.PosWorld2Image(target_pos_W).first;
 
-  // publish (u, v)
-  this->publish_u_v(u_v, victim_traj.header.stamp.sec + victim_traj.header.stamp.nsec/1e9);
+  // publish (u, v, d)
+  this->publish_detection(detection, victim_traj.header.stamp.sec + victim_traj.header.stamp.nsec/1e9);
 }
 
-void DummyDetector::publish_u_v(Eigen::Matrix<double, 2, 1> u_v, double stamp){
-  drogone_msgs_rmp::CameraUV msg;
+void DummyDetector::publish_detection(Eigen::Matrix<double, 3, 1> detection, double stamp){
+  drogone_msgs_rmp::target_detection msg;
   msg.header.stamp = ros::Time(stamp);
-  msg.u = u_v[0];
-  msg.v = u_v[1];
-  pub_u_v_.publish(msg);
+  msg.u = detection[0];
+  msg.v = detection[1];
+  msg.d = detection[2];
+  pub_detection_.publish(msg);
 }
 
 } // namespace drogone_dummy_detector
