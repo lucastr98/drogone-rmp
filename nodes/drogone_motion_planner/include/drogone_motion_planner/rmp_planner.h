@@ -50,10 +50,9 @@ class RMPPlanner{
 
   private:
     // Publishers & Subscribers
-    ros::Publisher trajectory_pub_;
-    ros::Publisher pose_pub_;
-    ros::Publisher u_v_pub_;
-    ros::Publisher f_u_v_pub_;
+    ros::Publisher pub_traj_;
+    ros::Publisher pub_pose_;
+    ros::Publisher pub_f_u_v_;
     ros::Subscriber sub_odom_;
     ros::Subscriber sub_follow_;
 

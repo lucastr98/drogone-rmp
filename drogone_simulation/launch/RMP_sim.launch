@@ -17,4 +17,9 @@
       <arg name="mav_name" value="$(arg mav_name)"/>
     </include>
 
+    <!-- launch dummy detector -->
+    <include file="$(find drogone_dummy_detector)/launch/dummy_detector.launch">
+      <arg name="mav_name" value="$(arg mav_name)"/>
+    </include>
+
 </launch>

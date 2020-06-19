@@ -74,9 +74,9 @@
   </node> -->
 
   <group ns="$(arg mav_name)"> <!-- check for catch communicates with FSM -> needs same namespaces as FSM-->
-      <node name="check_for_catch" pkg="simulation" type="check_for_catch" output="screen">
+      <node name="check_for_catch" pkg="drogone_simulation" type="check_for_catch" output="screen">
           <!-- <remap from="/drogone/command/trajectory" to="/$(arg mav_name)/command/trajectory"/> -->
-          <rosparam command="load" file="$(find simulation)/cfg/check_for_catch_params.yaml"/>
+          <rosparam command="load" file="$(find drogone_simulation)/cfg/check_for_catch_params.yaml"/>
       </node>
   </group>
 

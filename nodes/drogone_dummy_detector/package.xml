@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>drogone_rmp</name>
+
+  <name>drogone_dummy_detector</name>
   <version>0.0.0</version>
-  <description> RMP by DroGone </description>
+  <description> Dummy Detector that gives out (u, v) in simulation (transformed from victim drone world output) </description>
 
   <author email="lucastr@student.ethz.ch">Luca Strässle</author>
   <maintainer email="lucastr@student.ethz.ch">Luca Strässle</maintainer>
@@ -13,12 +14,17 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
   <depend>eigen_catkin</depend>
-  <depend>mav_msgs</depend>
-  <depend>mav_visualization</depend>
-  <depend>mav_planning_msgs</depend>
   <depend>eigen_checks</depend>
+  <depend>eigen_conversions</depend>
+
+  <depend>mav_msgs</depend>
+  <depend>mav_planning_msgs</depend>
+  <depend>drogone_msgs_rmp</depend>
+
+  <depend>drogone_transformation_lib</depend>
+
   <depend>roslib</depend>
   <depend>roscpp</depend>
   <depend>rospy</depend>
-  <depend>rmpcpp</depend>
+
 </package>

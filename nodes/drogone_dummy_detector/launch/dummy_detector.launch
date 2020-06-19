@@ -1,0 +1,13 @@
+<launch>
+    <arg name="mav_name" default="peregrine"/>
+
+    <group ns="$(arg mav_name)">
+
+      <node name="dummy_detector" pkg="drogone_dummy_detector" type="dummy_detector_node" output="screen">
+          <remap from="victim_trajectory" to="ground_truth_tracker"/>
+          <rosparam command="load" file="$(find drogone_dummy_detector)/cfg/$(arg mav_name)_camera_params.yaml"/>
+      </node>
+
+  </group>
+
+</launch>

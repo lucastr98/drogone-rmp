@@ -14,17 +14,15 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
   v_0_(0) {
 
     // publisher for trajectory to drone
-    trajectory_pub_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
+    pub_traj_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
         mav_msgs::default_topics::COMMAND_TRAJECTORY, 1);
 
     // publisher for trajectory to drone
-    pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(
+    pub_pose_ = nh_.advertise<geometry_msgs::PoseStamped>(
         mav_msgs::default_topics::COMMAND_POSE, 1);
 
-    // publisher for trajectory to drone
-    u_v_pub_ = nh_.advertise<drogone_msgs_rmp::CameraUV>("/u_v", 0);
-
-    f_u_v_pub_ = nh.advertise<drogone_msgs_rmp::AccFieldUV>("/f_u_v", 0);
+    // publisher for f_u_v for visualization
+    pub_f_u_v_ = nh.advertise<drogone_msgs_rmp::AccFieldUV>("/f_u_v", 0);
 
     // subscriber for Odometry from drone
     sub_odom_ =
@@ -199,13 +197,9 @@ bool RMPPlanner::TakeOff(){
   take_off_pose_msg.pose.position.x = take_off_pos[0];
   take_off_pose_msg.pose.position.y = take_off_pos[1];
   take_off_pose_msg.pose.position.z = take_off_pos[2];
-  take_off_pose_msg.pose.orientation.x = 0.0;
-  take_off_pose_msg.pose.orientation.y = 0.0;
-  take_off_pose_msg.pose.orientation.z = 0.0;
-  take_off_pose_msg.pose.orientation.w = 1.0;
   take_off_pose_msg.header.stamp = ros::Time::now();
 
-  pose_pub_.publish(take_off_pose_msg);
+  pub_pose_.publish(take_off_pose_msg);
 
   if(accuracy_reached(take_off_pos, 10)){
     ROS_WARN_STREAM("MP ----- TAKE OFF POSITION REACHED");
@@ -360,7 +354,7 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
     msg.x_dot_u = u_v_dot[0];
     msg.x_dot_v = u_v_dot[1];
     msg.header.stamp = ros::Time(t);
-    f_u_v_pub_.publish(msg);
+    pub_f_u_v_.publish(msg);
 
     t += dt;
   }
@@ -369,7 +363,7 @@ void RMPPlanner::follow_callback(const trajectory_msgs::MultiDOFJointTrajectory&
 
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
-  trajectory_pub_.publish(trajectory_msg);
+  pub_traj_.publish(trajectory_msg);
 
   ros::Duration(t).sleep();
   stop_sub_ = true;
@@ -455,7 +449,7 @@ bool RMPPlanner::Land(){
   land_pose_msg.pose.position.z = land_pos[2];
   land_pose_msg.header.stamp = ros::Time::now();
 
-  pose_pub_.publish(land_pose_msg);
+  pub_pose_.publish(land_pose_msg);
 
   if(accuracy_reached(land_pos, 10)){
     ROS_WARN_STREAM("MP ----- LAND POSITION REACHED");
@@ -521,40 +515,32 @@ void RMPPlanner::server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal
   }
 }
 
-bool RMPPlanner::accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time){
-  // determine position where drone currently is
-  Eigen::Vector3d position_now;
-  position_now = uav_state_.position;
+bool RMPPlanner::accuracy_reached(const Eigen::Vector3d& goal_pos, double max_time){
+  // create ros rate with the frequency to check whether position was reached
+  ros::Rate r(10);
 
-  // starting time to later watch how much time passed from here
-  ros::Time begin = ros::Time::now();
-  double begin_secs = begin.toSec();
+  // check if position was reached until max time
+  double time_since_pub = 0;
+  while(time_since_pub < max_time){
+    // determine position where drone currently is
+    Eigen::Vector3d position_now;
+    position_now = uav_state_.position;
 
-  double distance = std::sqrt(std::pow((goal_pos[0] - position_now[0]), 2) +
-                              std::pow((goal_pos[1] - position_now[1]), 2) +
-                              std::pow((goal_pos[2] - position_now[2]), 2));
+    // determine current distance to target
+    double distance = std::sqrt(std::pow((goal_pos[0] - position_now[0]), 2) +
+                                std::pow((goal_pos[1] - position_now[1]), 2) +
+                                std::pow((goal_pos[2] - position_now[2]), 2));
 
-  // while loop which ends, if we reach the desired position
-  while(distance > accuracy_){
-    // check how much time passed since we started. if >10 return false (abbort)
-    ros::spinOnce();
-    ros::Time end = ros::Time::now();
-    double end_secs = end.toSec();
-    double duration_secs = end_secs - begin_secs;
-    if(duration_secs > waiting_time){
-      return false;
-      break;
+    // check if we're already close enough
+    if(distance < accuracy_){
+      return true;
     }
-    else{
-      position_now = uav_state_.position;
-      distance = std::sqrt(std::pow((goal_pos[0] - position_now[0]), 2) +
-                           std::pow((goal_pos[1] - position_now[1]), 2) +
-                           std::pow((goal_pos[2] - position_now[2]), 2));
-      continue;
-    }
+    r.sleep();
+    time_since_pub += 0.1;
   }
-  // return true (succeed) when we break out of the while loop and haven't returned false (abborted) already
-  return true;
+
+  // if we come outta while without having returned true already, we didn't reach the point in time
+  return false;
 }
 
 } // namespace drogone_rmp_planner
