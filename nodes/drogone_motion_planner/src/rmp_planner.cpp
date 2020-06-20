@@ -7,11 +7,7 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
   nh_private_(nh_private),
   as_(nh, name, boost::bind(&RMPPlanner::server_callback, this, _1), false),
   action_name_(name),
-  first_odom_cb_(true),
-  f_x_(1140),
-  f_y_(1140),
-  u_0_(0),
-  v_0_(0) {
+  first_odom_cb_(true) {
 
     // publisher for trajectory to drone
     pub_traj_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(
@@ -22,7 +18,7 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
         mav_msgs::default_topics::COMMAND_POSE, 1);
 
     // publisher for f_u_v for visualization
-    pub_f_u_v_ = nh.advertise<drogone_msgs_rmp::AccFieldUV>("/f_u_v", 0);
+    pub_analyzation_ = nh_.advertise<drogone_msgs_rmp::AccFieldWithState>("acc_field_analyzation", 0);
 
     // subscriber for Odometry from drone
     sub_odom_ =
@@ -131,6 +127,7 @@ bool RMPPlanner::TakeOff(){
 bool RMPPlanner::Follow(){
   ROS_WARN_STREAM("MP ----- FOLLOW");
   stop_sub_ = false;
+  follow_counter_ = 0;
   sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::follow_callback, this);
   while((!(as_.isPreemptRequested())) && ros::ok() && !stop_sub_){}
   sub_follow_.shutdown();
@@ -143,6 +140,9 @@ bool RMPPlanner::Follow(){
 }
 
 void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victim_pos){
+  follow_counter_ += 1;
+
+  // store detection
   Eigen::Matrix<double, 3, 1> detection;
   detection[0] = victim_pos.u;
   detection[1] = victim_pos.v;
@@ -212,18 +212,12 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   vel[3] = uav_state_.yaw_vel;
   integrator.resetTo(pos, vel);
 
-  // create msg and define sampling interval & MPC_horizon
-  trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
-  double dt = 0.01;
-  double t = 0;
-  Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
-
   // set K matrix elements for jacobian calculation
   Eigen::Matrix<double, 4, 1> elems;
-  elems[0] = f_x_;
-  elems[1] = f_y_;
-  elems[2] = u_0_;
-  elems[3] = v_0_;
+  elems[0] = pinhole_constants_.f_x;
+  elems[1] = pinhole_constants_.f_y;
+  elems[2] = pinhole_constants_.u_0;
+  elems[3] = pinhole_constants_.v_0;
   task_space_geometry.SetK(elems);
 
   // create transformer to make transformations between image and world
@@ -243,6 +237,12 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   task_space_camera_geometry.setQ(pos);
   task_space_distance_geometry.setQ(pos);
 
+  // create msg and define sampling interval & MPC_horizon
+  trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
+  double dt = 0.01;
+  double t = 0;
+  double MPC_horizon = 2.0;
+  Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
   Eigen::Matrix<double, task_space_dimension, 1> u_v, u_v_dot, f_u_v;
   Eigen::Matrix<double, task_space_distance_dimension, 1> d, d_dot;
   Eigen::Vector3d cur_vel = uav_state_.velocity;
@@ -250,8 +250,32 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   // integrate 2s into the future
   for(double t = 0.0; t <= MPC_horizon + dt; t += dt){
     if(t > 0){
-      // TODO: setMatrices new in the transformer with the updated pose
-      //       (from updated acc) and update cur_vel
+      // get roll pitch yaw from acc
+      double roll, pitch, yaw;
+      yaw = traj_pos[3];
+      double a_x_B = traj_acc[0] * cos(yaw) + traj_acc[1] * sin(yaw);
+      double a_y_B = traj_acc[1] * cos(yaw) - traj_acc[0] * sin(yaw);
+      double a_z_B = traj_acc[2];
+      // roll = atan2(a_y_B, a_z_B + 9.81);
+      // pitch = atan2(a_x_B, a_z_B + 9.81);
+      roll = 0;
+      pitch = 0;
+
+      // define current pose and set transformation matrices new
+      Eigen::Affine3d cur_pose;
+      Eigen::AngleAxisd rollAngle((roll * M_PI) / 180, Eigen::Vector3d::UnitX());
+      Eigen::AngleAxisd pitchAngle((pitch * M_PI) / 180, Eigen::Vector3d::UnitY());
+      Eigen::AngleAxisd yawAngle((yaw * M_PI) / 180, Eigen::Vector3d::UnitZ());
+      cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
+      cur_pose.translation()[0] = traj_pos[0];
+      cur_pose.translation()[1] = traj_pos[1];
+      cur_pose.translation()[2] = traj_pos[2];
+      transformer.setMatrices(cur_pose);
+
+      // update current velocity, TODO: add yaw velocity??
+      cur_vel[0] = traj_vel[0];
+      cur_vel[1] = traj_vel[1];
+      cur_vel[2] = traj_vel[2];
     }
 
     // get u, v, d and normalization constant for velocity
@@ -264,90 +288,52 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
     // get the velocities
     Eigen::Matrix<double, 3, 1> image_vel =
-             transformer.VelWorld2Image(target_pos, uav_state_.velocity, vel_normalization);
+             transformer.VelWorld2Image(target_pos, cur_vel, vel_normalization);
     u_v_dot[0] = image_vel[0];
     u_v_dot[1] = image_vel[1];
     d_dot[0] = image_vel[2];
 
+    // integrate the policy with the (u, v, d) calculated
     integrator.setX(u_v, u_v_dot, d, d_dot);
     integrator.forwardIntegrate(dt);
     integrator.getState(&traj_pos, &traj_vel, &traj_acc);
 
-    // TODO: look at create traj point function and probably adjust it
+    // create trajectory point from current state and append it to the trajectory msg
     this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
-    this->publish_u_v_viz_msg(target_policy.getAccField(), u_v, u_v_dot, t);
+
+    // publish acc field and state for analyzation purposes
+    this->publish_u_v_viz_msg(target_policy.getAccField(), u_v, u_v_dot, d, d_dot, t);
   }
-
-
-
-  // while(!integrator.isDone()){
-  //   if(t == 0){
-  //     // set X in the integrator (u and v)
-  //     bool use_odom = true;
-  //     bool is_vel = false;
-  //     u_v = get_u_v(target_pos, use_odom, is_vel);
-  //     use_odom = true;
-  //     is_vel = true;
-  //     u_v_dot = get_u_v(target_vel, use_odom, is_vel);
-  //
-  //     integrator.setX(u_v, u_v_dot);
-  //   }
-  //   else{
-  //     // update Q in the Jacobian
-  //     task_space_geometry.setQ(traj_pos);
-  //
-  //     // update current state for calculation of u and v
-  //     update_cur_state(traj_pos, traj_acc);
-  //
-  //     // calculate u and v
-  //     bool use_odom = false;
-  //     bool is_vel = false;
-  //     u_v = get_u_v(target_pos, use_odom, is_vel);
-  //
-  //     // calculate relative velocity
-  //     Eigen::Vector3d relative_vel, cur_vel;
-  //     cur_vel[0] = traj_vel[0];
-  //     cur_vel[1] = traj_vel[1];
-  //     cur_vel[2] = traj_vel[2];
-  //     relative_vel = target_vel - cur_vel;
-  //
-  //     // calculate u_dot and v_dot with current velocity
-  //     use_odom = false;
-  //     is_vel = true;
-  //     u_v_dot = get_u_v(relative_vel, use_odom, is_vel);
-  //
-  //     integrator.setX(u_v, u_v_dot);
-  //   }
-  //   integrator.forwardIntegrate(dt);
-  //   integrator.getState(&traj_pos, &traj_vel, &traj_acc);
-  //   this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
-  //
-  //   f_u_v = target_policy.getAccField();
-  //   drogone_msgs_rmp::AccFieldUV msg;
-  //   msg.f_u = f_u_v[0];
-  //   msg.f_v = f_u_v[1];
-  //   msg.x_u = u_v[0];
-  //   msg.x_v = u_v[1];
-  //   msg.x_dot_u = u_v_dot[0];
-  //   msg.x_dot_v = u_v_dot[1];
-  //   msg.header.stamp = ros::Time(t);
-  //   pub_f_u_v_.publish(msg);
-  //
-  //   t += dt;
-  // }
-
-  ROS_WARN_STREAM(t);
 
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
 
-  ros::Duration(t).sleep();
-  stop_sub_ = true;
+  if(A_target_distance(0, 0) > 0){
+    Eigen::Vector3d goal_pos, end_pos;
+    goal_pos = target_pos;
+    goal_pos[2] -= distance_target[0];
+    end_pos[0] = traj_pos[0];
+    end_pos[1] = traj_pos[1];
+    end_pos[2] = traj_pos[2];
+    double diff = (goal_pos - end_pos).norm();
+    if(diff < 0.1){
+      ros::Duration(t).sleep();
+      stop_sub_ = true;
+    }
+  }
+  else{
+    if(follow_counter_ * 0.1 > 20){
+      ros::Duration(t).sleep();
+      stop_sub_ = true;
+    }
+  }
 }
 
-void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos, Eigen::Matrix<double, 4, 1> traj_vel,
-                                    Eigen::Matrix<double, 4, 1> traj_acc, trajectory_msgs::MultiDOFJointTrajectory *msg){
+void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
+                                   Eigen::Matrix<double, 4, 1> traj_vel,
+                                   Eigen::Matrix<double, 4, 1> traj_acc,
+                                   trajectory_msgs::MultiDOFJointTrajectory *msg){
   trajectory_msgs::MultiDOFJointTrajectoryPoint trajectory_point_msg;
   geometry_msgs::Vector3 pos_msg, vel_msg, acc_msg, ang_vel_msg, ang_acc_msg;
   geometry_msgs::Quaternion quat_msg;
@@ -388,31 +374,25 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
   msg->points.push_back(trajectory_point_msg);
 }
 
-void RMPPlanner::update_cur_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc){
-  double yaw = pos[3];
-
-  double a_x_B = acc[0] * cos(yaw) + acc[1] * sin(yaw);
-  double a_y_B = acc[1] * cos(yaw) - acc[0] * sin(yaw);
-  double a_z_B = acc[2];
-
-  double roll = atan2(a_y_B, a_z_B + 9.81);
-  double pitch = atan2(a_x_B, a_z_B + 9.81);
-  // double roll = 0;
-  // double pitch = 0;
-  // ROS_WARN_STREAM(roll * 180 / M_PI);
-  // ROS_WARN_STREAM(pitch * 180 / M_PI);
-  // ROS_WARN_STREAM(" ");
-
-  std::cout << "pitch:        " << pitch * 180 / M_PI << std::endl;
-  std::cout << "x-pos:        " << pos[0] << std::endl;
-
-  cur_roll_ = roll;
-  cur_pitch_ = pitch;
-  cur_yaw_ = yaw;
-  cur_pos_[0] = pos[0];
-  cur_pos_[1] = pos[1];
-  cur_pos_[2] = pos[2];
+void RMPPlanner::publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
+                                     Eigen::Matrix<double, 2, 1> u_v,
+                                     Eigen::Matrix<double, 2, 1> u_v_dot,
+                                     Eigen::Matrix<double, 1, 1> d,
+                                     Eigen::Matrix<double, 1, 1> d_dot,
+                                     double t){
+  drogone_msgs_rmp::AccFieldWithState msg;
+  msg.f_u = f_u_v[0];
+  msg.f_v = f_u_v[1];
+  msg.x_u = u_v[0];
+  msg.x_v = u_v[1];
+  msg.x_d = d[0];
+  msg.x_dot_u = u_v_dot[0];
+  msg.x_dot_v = u_v_dot[1];
+  msg.x_dot_d = d_dot[0];
+  msg.header.stamp = ros::Time(t);
+  pub_analyzation_.publish(msg);
 }
+
 
 bool RMPPlanner::Land(){
   ROS_WARN_STREAM("MP ----- LAND");

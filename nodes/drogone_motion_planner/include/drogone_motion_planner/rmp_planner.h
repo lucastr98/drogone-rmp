@@ -13,7 +13,7 @@
 #include <rmpcpp/eval/trapezoidal_integrator.h>
 #include <drogone_msgs_rmp/target_detection.h>
 #include <drogone_transformation_lib/transformations.h>
-#include <drogone_msgs_rmp/AccFieldUV.h>
+#include <drogone_msgs_rmp/AccFieldWithState.h>
 
 namespace drogone_rmp_planner {
 
@@ -32,7 +32,6 @@ class RMPPlanner{
     RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private);
 
     void uavOdomCallback(const nav_msgs::Odometry::ConstPtr& pose);
-    Eigen::Matrix<double, 2, 1> get_u_v(Eigen::Vector3d target, bool use_odom, bool is_vel); // Eigen::Quaterniond q);
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
@@ -41,9 +40,10 @@ class RMPPlanner{
     bool Land();
 
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
-    void create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos, Eigen::Matrix<double, 4, 1> traj_vel,
-                                     Eigen::Matrix<double, 4, 1> traj_acc, trajectory_msgs::MultiDOFJointTrajectory *msg);
-    void update_cur_state(Eigen::Matrix<double, 4, 1> pos, Eigen::Matrix<double, 4, 1> acc);
+    void create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
+                           Eigen::Matrix<double, 4, 1> traj_vel,
+                           Eigen::Matrix<double, 4, 1> traj_acc,
+                           trajectory_msgs::MultiDOFJointTrajectory *msg);
 
   protected:
     actionlib::SimpleActionServer<drogone_action_rmp::FSMAction> as_;
@@ -53,7 +53,7 @@ class RMPPlanner{
     // Publishers & Subscribers
     ros::Publisher pub_traj_;
     ros::Publisher pub_pose_;
-    ros::Publisher pub_f_u_v_;
+    ros::Publisher pub_analyzation_;
     ros::Subscriber sub_odom_;
     ros::Subscriber sub_follow_;
 
@@ -69,16 +69,8 @@ class RMPPlanner{
     // camera constraints
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
-    double f_x_;
-    double f_y_;
-    double u_0_;
-    double v_0_;
 
-    // roll pitch yaw
-    double cur_roll_;
-    double cur_pitch_;
-    double cur_yaw_;
-    Eigen::Vector3d cur_pos_;
+    int follow_counter_;
 
     double accuracy_ = 0.3;
     bool stop_sub_;
