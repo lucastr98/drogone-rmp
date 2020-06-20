@@ -8,9 +8,12 @@
 
 #include <drogone_action_rmp/FSMAction.h>
 #include <drogone_motion_planner/cart_cam_geom.h>
+#include <drogone_motion_planner/distance_geom.h>
+#include <drogone_motion_planner/simple_camera_target_policy.h>
+#include <drogone_motion_planner/simple_distance_target_policy.h>
+#include <drogone_motion_planner/trapezoidal_integrator.h>
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
-#include <rmpcpp/eval/trapezoidal_integrator.h>
 #include <drogone_msgs_rmp/target_detection.h>
 #include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldWithState.h>
@@ -44,6 +47,13 @@ class RMPPlanner{
                            Eigen::Matrix<double, 4, 1> traj_vel,
                            Eigen::Matrix<double, 4, 1> traj_acc,
                            trajectory_msgs::MultiDOFJointTrajectory *msg);
+    void publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
+                                 Eigen::Matrix<double, 2, 1> u_v,
+                                 Eigen::Matrix<double, 2, 1> u_v_dot,
+                                 Eigen::Matrix<double, 1, 1> f_d,
+                                 Eigen::Matrix<double, 1, 1> d,
+                                 Eigen::Matrix<double, 1, 1> d_dot,
+                                 double t);
 
   protected:
     actionlib::SimpleActionServer<drogone_action_rmp::FSMAction> as_;

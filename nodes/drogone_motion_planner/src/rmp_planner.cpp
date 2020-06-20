@@ -3,10 +3,10 @@
 namespace drogone_rmp_planner {
 
 RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private):
-  nh_(nh),
-  nh_private_(nh_private),
   as_(nh, name, boost::bind(&RMPPlanner::server_callback, this, _1), false),
   action_name_(name),
+  nh_(nh),
+  nh_private_(nh_private),
   first_odom_cb_(true) {
 
     // publisher for trajectory to drone
@@ -157,8 +157,8 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   distance_geometry task_space_distance_geometry;
 
   // create containers for policies in the same geometry of the task spaces
-  rmpcpp::PolicyContainer2<camera_geometry> camera_container(task_space_camera_geometry);
-  rmpcpp::PolicyContainer2<distance_geometry> distance_container(task_space_distance_geometry);
+  rmpcpp::PolicyContainer<camera_geometry> camera_container(task_space_camera_geometry);
+  rmpcpp::PolicyContainer<distance_geometry> distance_container(task_space_distance_geometry);
 
   // create simple target policy in camera task space
   const int task_space_camera_dimension = camera_geometry::K;
@@ -197,10 +197,10 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   distance_container.addPolicy(&distance_target_policy);
 
   // create a trapezoidal integrator with the containers
-  rmpcpp::TrapezoidalIntegrator2<camera_geometry, distance_geometry> integrator(camera_container, distance_container);
+  rmpcpp::TrapezoidalIntegrator<camera_geometry, distance_geometry> integrator(camera_container, distance_container);
 
   // reset integrator with current pos and vel for x, y, z, yaw
-  const int config_space_dimension = geometry::D;
+  const int config_space_dimension = camera_geometry::D;
   Eigen::Matrix<double, config_space_dimension, 1> pos, vel;
   pos[0] = uav_state_.position[0];
   pos[1] = uav_state_.position[1];
@@ -218,13 +218,13 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   elems[1] = pinhole_constants_.f_y;
   elems[2] = pinhole_constants_.u_0;
   elems[3] = pinhole_constants_.v_0;
-  task_space_geometry.SetK(elems);
+  task_space_camera_geometry.SetK(elems);
 
   // create transformer to make transformations between image and world
   Eigen::Affine3d uav_pose;
   uav_pose.translation() = uav_state_.position;
   uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
-  drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_);
+  drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
 
   // calculate target position in world frame
   Eigen::Vector3d target_pos = transformer.PosImage2World(detection);
@@ -241,9 +241,9 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
   double dt = 0.01;
   double t = 0;
-  double MPC_horizon = 2.0;
+  double MPC_horizon = 20.0;
   Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
-  Eigen::Matrix<double, task_space_dimension, 1> u_v, u_v_dot, f_u_v;
+  Eigen::Matrix<double, task_space_camera_dimension, 1> u_v, u_v_dot, f_u_v;
   Eigen::Matrix<double, task_space_distance_dimension, 1> d, d_dot;
   Eigen::Vector3d cur_vel = uav_state_.velocity;
 
@@ -256,8 +256,8 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       double a_x_B = traj_acc[0] * cos(yaw) + traj_acc[1] * sin(yaw);
       double a_y_B = traj_acc[1] * cos(yaw) - traj_acc[0] * sin(yaw);
       double a_z_B = traj_acc[2];
-      // roll = atan2(a_y_B, a_z_B + 9.81);
-      // pitch = atan2(a_x_B, a_z_B + 9.81);
+      roll = atan2(a_y_B, a_z_B + 9.81);
+      pitch = atan2(a_x_B, a_z_B + 9.81);
       roll = 0;
       pitch = 0;
 
@@ -283,7 +283,7 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
              transformer.PosWorld2Image(target_pos);
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
-    d = image_pair.first[2];
+    d[0] = image_pair.first[2];
     double vel_normalization = image_pair.second;
 
     // get the velocities
@@ -302,32 +302,36 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
     this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
 
     // publish acc field and state for analyzation purposes
-    this->publish_u_v_viz_msg(target_policy.getAccField(), u_v, u_v_dot, d, d_dot, t);
+    this->publish_analyzation_msg(camera_target_policy.getAccField(), u_v, u_v_dot,
+                                  distance_target_policy.getAccField(), d, d_dot, t);
   }
 
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
 
-  if(A_target_distance(0, 0) > 0){
-    Eigen::Vector3d goal_pos, end_pos;
-    goal_pos = target_pos;
-    goal_pos[2] -= distance_target[0];
-    end_pos[0] = traj_pos[0];
-    end_pos[1] = traj_pos[1];
-    end_pos[2] = traj_pos[2];
-    double diff = (goal_pos - end_pos).norm();
-    if(diff < 0.1){
-      ros::Duration(t).sleep();
-      stop_sub_ = true;
-    }
-  }
-  else{
-    if(follow_counter_ * 0.1 > 20){
-      ros::Duration(t).sleep();
-      stop_sub_ = true;
-    }
-  }
+  // if(A_target_distance(0, 0) > 0){
+  //   Eigen::Vector3d goal_pos, end_pos;
+  //   goal_pos = target_pos;
+  //   goal_pos[2] -= distance_target[0];
+  //   end_pos[0] = traj_pos[0];
+  //   end_pos[1] = traj_pos[1];
+  //   end_pos[2] = traj_pos[2];
+  //   double diff = (goal_pos - end_pos).norm();
+  //   if(diff < 0.1){
+  //     ros::Duration(t).sleep();
+  //     stop_sub_ = true;
+  //   }
+  // }
+  // else{
+  //   if(follow_counter_ * 0.1 > 20){
+  //     ros::Duration(t).sleep();
+  //     stop_sub_ = true;
+  //   }
+  // }
+
+  ros::Duration(t).sleep();
+  stop_sub_ = true;
 }
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
@@ -375,14 +379,16 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
 }
 
 void RMPPlanner::publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
-                                     Eigen::Matrix<double, 2, 1> u_v,
-                                     Eigen::Matrix<double, 2, 1> u_v_dot,
-                                     Eigen::Matrix<double, 1, 1> d,
-                                     Eigen::Matrix<double, 1, 1> d_dot,
-                                     double t){
+                                         Eigen::Matrix<double, 2, 1> u_v,
+                                         Eigen::Matrix<double, 2, 1> u_v_dot,
+                                         Eigen::Matrix<double, 1, 1> f_d,
+                                         Eigen::Matrix<double, 1, 1> d,
+                                         Eigen::Matrix<double, 1, 1> d_dot,
+                                         double t){
   drogone_msgs_rmp::AccFieldWithState msg;
   msg.f_u = f_u_v[0];
   msg.f_v = f_u_v[1];
+  msg.f_d = f_d[0];
   msg.x_u = u_v[0];
   msg.x_v = u_v[1];
   msg.x_d = d[0];

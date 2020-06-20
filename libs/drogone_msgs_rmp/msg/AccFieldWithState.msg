@@ -1,6 +1,7 @@
 std_msgs/Header header
 float32 f_u
 float32 f_v
+float32 f_d
 float32 x_u
 float32 x_v
 float32 x_d

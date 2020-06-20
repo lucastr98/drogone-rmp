@@ -92,8 +92,6 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   Eigen::Vector3d target_pos_W;
   tf::vectorMsgToEigen(victim_traj.points[0].transforms[0].translation, target_pos_W);
 
-  ROS_WARN_STREAM(target_pos_W);
-
   // check if point is in fov before transforming
   double fov_x = 2 * atan2(w_, 2 * pinhole_constants_.f_x);
   double fov_y = 2 * atan2(h_, 2 * pinhole_constants_.f_y);
