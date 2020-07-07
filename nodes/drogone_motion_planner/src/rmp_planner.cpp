@@ -88,26 +88,32 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
                               physical_uav_state_.orientation.x() * physical_uav_state_.orientation.y()),
                               1 - 2 * (physical_uav_state_.orientation.y() * physical_uav_state_.orientation.y() +
                               physical_uav_state_.orientation.z() * physical_uav_state_.orientation.z()));
-  physical_uav_state_.yaw_vel = odom->twist.twist.angular.z;
 
   // store current_velocity_ from before, before changing it
   Eigen::Vector3d v0, v1;
+  double v0_yaw, v1_yaw;
   v0 = physical_uav_state_.velocity;
+  v0_yaw = physical_uav_state_.yaw_vel;
 
   // store current velocity (after transforming it from msg to an Eigen vector)
   tf::vectorMsgToEigen(odom->twist.twist.linear, physical_uav_state_.velocity);
   physical_uav_state_.velocity = physical_uav_state_.orientation.toRotationMatrix() * physical_uav_state_.velocity;
+  physical_uav_state_.yaw_vel = odom->twist.twist.angular.z;
 
   double t = duration;
   v1 = physical_uav_state_.velocity;
+  v1_yaw = physical_uav_state_.yaw_vel;
+
 
   // calculate acceleration if it shoule be calc by odom; a = (v1 - v0) / t
   if(first_odom_cb_){
     physical_uav_state_.acceleration << 0.0, 0.0, 0.0;
+    physical_uav_state_.yaw_acc = 0.0;
     first_odom_cb_ = false;
   }
   else{
     physical_uav_state_.acceleration = (v1 - v0) / t;
+    physical_uav_state_.yaw_acc = (v1_yaw - v0_yaw) / t;
   }
 
   // store stamp of current msg
@@ -125,6 +131,7 @@ void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory:
                               1 - 2 * (trajectory_uav_state_.orientation.y() * trajectory_uav_state_.orientation.y() +
                               trajectory_uav_state_.orientation.z() * trajectory_uav_state_.orientation.z()));
   trajectory_uav_state_.yaw_vel = traj->points[point_num].velocities[0].angular.z;
+  trajectory_uav_state_.yaw_acc = traj->points[point_num].accelerations[0].angular.z;
 };
 
 
@@ -235,7 +242,7 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // reset integrator with current pos and vel for x, y, z, yaw
   const int config_space_dimension = camera_geometry::D;
-  Eigen::Matrix<double, config_space_dimension, 1> pos, vel;
+  Eigen::Matrix<double, config_space_dimension, 1> pos, vel, acc;
   pos[0] = follow_uav_state.position[0];
   pos[1] = follow_uav_state.position[1];
   pos[2] = follow_uav_state.position[2];
@@ -244,7 +251,11 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   vel[1] = follow_uav_state.velocity[1];
   vel[2] = follow_uav_state.velocity[2];
   vel[3] = follow_uav_state.yaw_vel;
-  integrator.resetTo(pos, vel);
+  acc[0] = follow_uav_state.acceleration[0];
+  acc[1] = follow_uav_state.acceleration[1];
+  acc[2] = follow_uav_state.acceleration[2];
+  acc[3] = follow_uav_state.yaw_acc;
+  integrator.resetTo(pos, vel, acc);
 
   // set K matrix elements for jacobian calculation
   Eigen::Matrix<double, 4, 1> elems;

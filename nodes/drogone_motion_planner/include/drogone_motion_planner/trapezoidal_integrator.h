@@ -56,9 +56,10 @@ class TrapezoidalIntegrator {
   /**
    *  Reset integrator to a specific state.
    */
-  void resetTo(const Vector_q position, const Vector_q velocity = Vector_q::Zero()) {
+  void resetTo(const Vector_q position, const Vector_q velocity = Vector_q::Zero(), const Vector_q acceleration = Vector_q::Zero()) {
     current_pos_ = position;
     current_vel_ = velocity;
+    last_acc_ = acceleration;
     distance_ = 0.0;
     done_ = false;
     counter_ = 0;
@@ -90,6 +91,8 @@ class TrapezoidalIntegrator {
     Vector_q dist_increment;
     acc_a = last_acc_;
     vel_a = current_vel_;
+
+    ROS_WARN_STREAM(last_acc_[0]);
 
     // evaluate policy and get new accelerations
     acc_b1 = policy1_.evaluate(pos_x1_, x1_dot_);

@@ -32,6 +32,7 @@ struct UAVState {
   Eigen::Quaterniond orientation;
   double yaw;
   double yaw_vel;
+  double yaw_acc;
 };
 
 class RMPPlanner{

@@ -50,7 +50,11 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
   SimpleCameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = alpha_ * s(this->space_->minus(target_, x)) * 200 - beta_ * x_dot;
+    this->f_ = alpha_ * s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+  }
+
+  void updateMaxAcc(double max_acc){
+    max_acc_ = max_acc_;
   }
 
   Vector getAccField(){
@@ -71,6 +75,7 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
   Vector target_;
   double alpha_{1.0}, beta_{8.0}, c_{0.005};
   double sigma_{sqrt((1024 / 2) * (1024 / 2) + (768 / 2) * (768 / 2))};
+  double max_acc_ = 400;
 };
 
 }  // namespace rmpcpp
