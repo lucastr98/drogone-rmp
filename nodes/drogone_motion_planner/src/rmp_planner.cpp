@@ -19,10 +19,15 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
 
     // publisher for f_u_v for visualization
     pub_analyzation_ = nh_.advertise<drogone_msgs_rmp::AccFieldWithState>("acc_field_analyzation", 0);
+    pub_analyzation_policy_ = nh_.advertise<drogone_msgs_rmp::AnalyzePolicy>("analyze_policy", 0);
 
-    // subscriber for Odometry from drone
+    // subscriber to Odometry for physical uav state
     sub_odom_ =
-        nh.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
+        nh_.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
+
+    // subscriber to Trajectory for trajectory uav state
+    sub_traj_ =
+        nh_.subscribe("/peregrine/command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
 
     // load params
     if(!nh_private_.getParam("f_x", pinhole_constants_.f_x)){
@@ -54,6 +59,16 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     }
     camera_mounting_.translation << cam_trans[0], cam_trans[1], cam_trans[2];
 
+    if(!nh_private_.getParam("frequency", frequency_)){
+      ROS_ERROR("failed to load frequency");
+    }
+    if(!nh_private_.getParam("MPC_horizon", MPC_horizon_)){
+      ROS_ERROR("failed to load MPC_horizon");
+    }
+    if(!nh_private_.getParam("sampling_interval", sampling_interval_)){
+      ROS_ERROR("failed to load sampling_interval");
+    }
+
     as_.start();
 }
 
@@ -61,43 +76,57 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
 void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
   // calculate the time between the 2 measurements based on stamps
   double duration = odom->header.stamp.sec + odom->header.stamp.nsec/1e9 - old_stamp_;
-  uav_state_.timestamp = odom->header.stamp;
+  physical_uav_state_.timestamp = odom->header.stamp;
 
   // store pose
   Eigen::Affine3d current_pose;
   tf::poseMsgToEigen(odom->pose.pose, current_pose);
 
-  uav_state_.position = current_pose.translation();
-  uav_state_.orientation = current_pose.linear();
-  uav_state_.yaw = std::atan2(2 * (uav_state_.orientation.w() * uav_state_.orientation.z() +
-                              uav_state_.orientation.x() * uav_state_.orientation.y()),
-                              1 - 2 * (uav_state_.orientation.y() * uav_state_.orientation.y() +
-                              uav_state_.orientation.z() * uav_state_.orientation.z()));
-  uav_state_.yaw_vel = odom->twist.twist.angular.z;
+  physical_uav_state_.position = current_pose.translation();
+  physical_uav_state_.orientation = current_pose.linear();
+  physical_uav_state_.yaw = std::atan2(2 * (physical_uav_state_.orientation.w() * physical_uav_state_.orientation.z() +
+                              physical_uav_state_.orientation.x() * physical_uav_state_.orientation.y()),
+                              1 - 2 * (physical_uav_state_.orientation.y() * physical_uav_state_.orientation.y() +
+                              physical_uav_state_.orientation.z() * physical_uav_state_.orientation.z()));
+  physical_uav_state_.yaw_vel = odom->twist.twist.angular.z;
 
   // store current_velocity_ from before, before changing it
   Eigen::Vector3d v0, v1;
-  v0 = uav_state_.velocity;
+  v0 = physical_uav_state_.velocity;
 
   // store current velocity (after transforming it from msg to an Eigen vector)
-  tf::vectorMsgToEigen(odom->twist.twist.linear, uav_state_.velocity);
-  uav_state_.velocity = uav_state_.orientation.toRotationMatrix() * uav_state_.velocity;
+  tf::vectorMsgToEigen(odom->twist.twist.linear, physical_uav_state_.velocity);
+  physical_uav_state_.velocity = physical_uav_state_.orientation.toRotationMatrix() * physical_uav_state_.velocity;
 
   double t = duration;
-  v1 = uav_state_.velocity;
+  v1 = physical_uav_state_.velocity;
 
   // calculate acceleration if it shoule be calc by odom; a = (v1 - v0) / t
   if(first_odom_cb_){
-    uav_state_.acceleration << 0.0, 0.0, 0.0;
+    physical_uav_state_.acceleration << 0.0, 0.0, 0.0;
     first_odom_cb_ = false;
   }
   else{
-    uav_state_.acceleration = (v1 - v0) / t;
+    physical_uav_state_.acceleration = (v1 - v0) / t;
   }
 
   // store stamp of current msg
   old_stamp_ = odom->header.stamp.sec + odom->header.stamp.nsec/1e9;
 }
+
+void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory::ConstPtr& traj){
+  int point_num = 1 / frequency_ / sampling_interval_ - 1;
+  tf::vectorMsgToEigen(traj->points[point_num].transforms[0].translation, trajectory_uav_state_.position);
+  tf::vectorMsgToEigen(traj->points[point_num].velocities[0].linear, trajectory_uav_state_.velocity);
+  tf::vectorMsgToEigen(traj->points[point_num].accelerations[0].linear, trajectory_uav_state_.acceleration);
+  tf::quaternionMsgToEigen(traj->points[point_num].transforms[0].rotation, trajectory_uav_state_.orientation);
+  trajectory_uav_state_.yaw = std::atan2(2 * (trajectory_uav_state_.orientation.w() * trajectory_uav_state_.orientation.z() +
+                              trajectory_uav_state_.orientation.x() * trajectory_uav_state_.orientation.y()),
+                              1 - 2 * (trajectory_uav_state_.orientation.y() * trajectory_uav_state_.orientation.y() +
+                              trajectory_uav_state_.orientation.z() * trajectory_uav_state_.orientation.z()));
+  trajectory_uav_state_.yaw_vel = traj->points[point_num].velocities[0].angular.z;
+};
+
 
 
 bool RMPPlanner::TakeOff(){
@@ -126,21 +155,26 @@ bool RMPPlanner::TakeOff(){
 
 bool RMPPlanner::Follow(){
   ROS_WARN_STREAM("MP ----- FOLLOW");
-  stop_sub_ = false;
   follow_counter_ = 0;
   sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::follow_callback, this);
-  while((!(as_.isPreemptRequested())) && ros::ok() && !stop_sub_){}
-  sub_follow_.shutdown();
-  if(as_.isPreemptRequested()){
-    as_.setPreempted();
-  }
-  if(stop_sub_){
-    return true;
-  }
+
+  // lock the mutex and wait until it is unlocked (in catch_traj, once last traj is calculated)
+  std::unique_lock<std::mutex> uLock(mutex_);
+  cond_var_.wait(uLock);
+  return true;
 }
 
 void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victim_pos){
   follow_counter_ += 1;
+  UAVState follow_uav_state;
+  if(follow_counter_ == 1){
+    follow_uav_state = physical_uav_state_;
+    ROS_WARN_STREAM("MP ----- USING PHYSICAL FOR UAV STATE");
+  }
+  else{
+    follow_uav_state = trajectory_uav_state_;
+    ROS_WARN_STREAM("MP ----- USING TRAJECTORY FOR UAV STATE");
+  }
 
   // store detection
   Eigen::Matrix<double, 3, 1> detection;
@@ -202,14 +236,14 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   // reset integrator with current pos and vel for x, y, z, yaw
   const int config_space_dimension = camera_geometry::D;
   Eigen::Matrix<double, config_space_dimension, 1> pos, vel;
-  pos[0] = uav_state_.position[0];
-  pos[1] = uav_state_.position[1];
-  pos[2] = uav_state_.position[2];
-  pos[3] = uav_state_.yaw;
-  vel[0] = uav_state_.velocity[0];
-  vel[1] = uav_state_.velocity[1];
-  vel[2] = uav_state_.velocity[2];
-  vel[3] = uav_state_.yaw_vel;
+  pos[0] = follow_uav_state.position[0];
+  pos[1] = follow_uav_state.position[1];
+  pos[2] = follow_uav_state.position[2];
+  pos[3] = follow_uav_state.yaw;
+  vel[0] = follow_uav_state.velocity[0];
+  vel[1] = follow_uav_state.velocity[1];
+  vel[2] = follow_uav_state.velocity[2];
+  vel[3] = follow_uav_state.yaw_vel;
   integrator.resetTo(pos, vel);
 
   // set K matrix elements for jacobian calculation
@@ -222,8 +256,8 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // create transformer to make transformations between image and world
   Eigen::Affine3d uav_pose;
-  uav_pose.translation() = uav_state_.position;
-  uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
+  uav_pose.translation() = follow_uav_state.position;
+  uav_pose.linear() = follow_uav_state.orientation.toRotationMatrix();
   drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
 
   // calculate target position in world frame
@@ -239,16 +273,15 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // create msg and define sampling interval & MPC_horizon
   trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
-  double dt = 0.01;
   double t = 0;
-  double MPC_horizon = 20.0;
   Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
   Eigen::Matrix<double, task_space_camera_dimension, 1> u_v, u_v_dot, f_u_v;
   Eigen::Matrix<double, task_space_distance_dimension, 1> d, d_dot;
-  Eigen::Vector3d cur_vel = uav_state_.velocity;
+  Eigen::Vector3d cur_vel = follow_uav_state.velocity;
+
 
   // integrate 2s into the future
-  for(double t = 0.0; t <= MPC_horizon + dt; t += dt){
+  for(double t = 0.0; t <= MPC_horizon_ + sampling_interval_; t += sampling_interval_){
     if(t > 0){
       // get roll pitch yaw from acc
       double roll, pitch, yaw;
@@ -258,8 +291,8 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       double a_z_B = traj_acc[2];
       roll = atan2(a_y_B, a_z_B + 9.81);
       pitch = atan2(a_x_B, a_z_B + 9.81);
-      roll = 0;
-      pitch = 0;
+      // roll = 0;
+      // pitch = 0;
 
       // define current pose and set transformation matrices new
       Eigen::Affine3d cur_pose;
@@ -281,6 +314,11 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
     // get u, v, d and normalization constant for velocity
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
              transformer.PosWorld2Image(target_pos);
+
+    // // calc camera velocity in (u, v)
+    // double u_dot_camera = image_pair.first[0] - u_v[0];
+    // double v_dot_camera = image_pair.first[1] - u_v[1];
+
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
     d[0] = image_pair.first[2];
@@ -295,7 +333,7 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
     // integrate the policy with the (u, v, d) calculated
     integrator.setX(u_v, u_v_dot, d, d_dot);
-    integrator.forwardIntegrate(dt);
+    integrator.forwardIntegrate(sampling_interval_);
     integrator.getState(&traj_pos, &traj_vel, &traj_acc);
 
     // create trajectory point from current state and append it to the trajectory msg
@@ -310,28 +348,49 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
 
-  // if(A_target_distance(0, 0) > 0){
-  //   Eigen::Vector3d goal_pos, end_pos;
-  //   goal_pos = target_pos;
-  //   goal_pos[2] -= distance_target[0];
-  //   end_pos[0] = traj_pos[0];
-  //   end_pos[1] = traj_pos[1];
-  //   end_pos[2] = traj_pos[2];
-  //   double diff = (goal_pos - end_pos).norm();
-  //   if(diff < 0.1){
-  //     ros::Duration(t).sleep();
-  //     stop_sub_ = true;
-  //   }
-  // }
-  // else{
-  //   if(follow_counter_ * 0.1 > 20){
-  //     ros::Duration(t).sleep();
-  //     stop_sub_ = true;
-  //   }
-  // }
+  // if distance policy is set, check if distance is reached
+  if(A_target_distance(0, 0) > 0){
+    Eigen::Vector3d goal_pos, end_pos;
+    goal_pos = target_pos;
+    goal_pos[2] -= distance_target[0];
+    end_pos[0] = traj_pos[0];
+    end_pos[1] = traj_pos[1];
+    end_pos[2] = traj_pos[2];
+    double diff = (goal_pos - end_pos).norm();
+    // if distance is reached by the end of current traj stop sub and wait until traj is flown
+    if(diff < 0.1){
+      ros::Duration(t).sleep();
 
-  ros::Duration(t).sleep();
-  stop_sub_ = true;
+      // take ownership of the mutex (unlock mutex from the lock in Follow())
+      std::lock_guard<std::mutex> guard(mutex_);
+      // notify the condition variable to stop waiting (in Follow())
+      cond_var_.notify_one();
+      // stop subscriber
+      sub_follow_.shutdown();
+    }
+  }
+  else{
+    // if distance policy isn't set wait 20s before stopping replanning
+    if(follow_counter_ * 0.1 > 20){
+      ros::Duration(t).sleep();
+
+      // take ownership of the mutex (unlock mutex from the lock in Follow())
+      std::lock_guard<std::mutex> guard(mutex_);
+      // notify the condition variable to stop waiting (in Follow())
+      cond_var_.notify_one();
+      // stop subscriber
+      sub_follow_.shutdown();
+    }
+  }
+
+  // // use this if replanning is unwanted and comment the if-else above
+  // ros::Duration(t).sleep();
+  // // take ownership of the mutex (unlock mutex from the lock in Follow())
+  // std::lock_guard<std::mutex> guard(mutex_);
+  // // notify the condition variable to stop waiting (in Follow())
+  // cond_var_.notify_one();
+  // // stop subscriber
+  // sub_follow_.shutdown();
 }
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
@@ -487,7 +546,7 @@ bool RMPPlanner::accuracy_reached(const Eigen::Vector3d& goal_pos, double max_ti
   while(time_since_pub < max_time){
     // determine position where drone currently is
     Eigen::Vector3d position_now;
-    position_now = uav_state_.position;
+    position_now = physical_uav_state_.position;
 
     // determine current distance to target
     double distance = std::sqrt(std::pow((goal_pos[0] - position_now[0]), 2) +

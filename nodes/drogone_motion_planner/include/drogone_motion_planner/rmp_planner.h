@@ -5,6 +5,9 @@
 #include <actionlib/server/simple_action_server.h>
 #include <mav_msgs/conversions.h>
 #include <mav_msgs/default_topics.h>
+#include <chrono>
+#include <mutex>
+#include <condition_variable>
 
 #include <drogone_action_rmp/FSMAction.h>
 #include <drogone_motion_planner/cart_cam_geom.h>
@@ -15,6 +18,7 @@
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <drogone_msgs_rmp/target_detection.h>
+#include <drogone_msgs_rmp/AnalyzePolicy.h>
 #include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldWithState.h>
 
@@ -35,6 +39,7 @@ class RMPPlanner{
     RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private);
 
     void uavOdomCallback(const nav_msgs::Odometry::ConstPtr& pose);
+    void uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory::ConstPtr& traj);
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
@@ -64,7 +69,9 @@ class RMPPlanner{
     ros::Publisher pub_traj_;
     ros::Publisher pub_pose_;
     ros::Publisher pub_analyzation_;
+    ros::Publisher pub_analyzation_policy_;
     ros::Subscriber sub_odom_;
+    ros::Subscriber sub_traj_;
     ros::Subscriber sub_follow_;
 
     // NodeHandles
@@ -72,7 +79,8 @@ class RMPPlanner{
     ros::NodeHandle nh_private_;
 
     // flight state of the drone
-    UAVState uav_state_;
+    UAVState physical_uav_state_;
+    UAVState trajectory_uav_state_;
     bool first_odom_cb_;
     double old_stamp_;
 
@@ -80,12 +88,23 @@ class RMPPlanner{
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
 
-    int follow_counter_;
+    uint follow_counter_;
 
     double accuracy_ = 0.3;
+    double frequency_;
+    double MPC_horizon_;
+    double sampling_interval_;
     bool stop_sub_;
 
     double normalize_u_v_;
+
+    // condition variable
+    std::condition_variable cond_var_;
+    std::mutex mutex_;
+
+    // analyze computational time
+    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t1_;
+    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t2_;
 };
 
 } // namespace drogone_motion_planning

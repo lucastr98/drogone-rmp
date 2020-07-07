@@ -28,7 +28,7 @@ class VictimDrone(object):
         self.velocity_spread = 0 #0.08 #** #velocity variation. set to zero if no velocity change is wanted
         self.velocity_max = 5 #maximum velocity for varaition
         self.velocity_min = 0.25 #maximum velocity for varaition
-        self.rate = 100.0 #** #rate in Hz at which /victim_drone/odometry is published and therefore rate at which planner.cpp plans a new trajectory
+        self.rate = 100.0 #** #rate in Hz at which /victim_drone/odometry is published
         self.dt = 1/self.rate #time interval between two published msgs
         self.dt_dur= rospy.Duration(self.dt)
         #starting point
