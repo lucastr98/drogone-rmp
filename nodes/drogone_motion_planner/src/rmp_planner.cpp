@@ -19,7 +19,6 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
 
     // publisher for f_u_v for visualization
     pub_analyzation_ = nh_.advertise<drogone_msgs_rmp::AccFieldWithState>("acc_field_analyzation", 0);
-    pub_analyzation_policy_ = nh_.advertise<drogone_msgs_rmp::AnalyzePolicy>("analyze_policy", 0);
 
     // subscriber to Odometry for physical uav state
     sub_odom_ =
@@ -84,10 +83,10 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
 
   physical_uav_state_.position = current_pose.translation();
   physical_uav_state_.orientation = current_pose.linear();
-  physical_uav_state_.yaw = std::atan2(2 * (physical_uav_state_.orientation.w() * physical_uav_state_.orientation.z() +
-                              physical_uav_state_.orientation.x() * physical_uav_state_.orientation.y()),
-                              1 - 2 * (physical_uav_state_.orientation.y() * physical_uav_state_.orientation.y() +
-                              physical_uav_state_.orientation.z() * physical_uav_state_.orientation.z()));
+  physical_uav_state_.yaw = std::atan2(2.0 * (physical_uav_state_.orientation.w() * physical_uav_state_.orientation.z() +
+                                       physical_uav_state_.orientation.x() * physical_uav_state_.orientation.y()),
+                                       1.0 - 2.0 * (physical_uav_state_.orientation.y() * physical_uav_state_.orientation.y() +
+                                       physical_uav_state_.orientation.z() * physical_uav_state_.orientation.z()));
 
   // store current_velocity_ from before, before changing it
   Eigen::Vector3d v0, v1;
@@ -125,13 +124,25 @@ void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory:
   tf::vectorMsgToEigen(traj->points[point_num].transforms[0].translation, trajectory_uav_state_.position);
   tf::vectorMsgToEigen(traj->points[point_num].velocities[0].linear, trajectory_uav_state_.velocity);
   tf::vectorMsgToEigen(traj->points[point_num].accelerations[0].linear, trajectory_uav_state_.acceleration);
-  tf::quaternionMsgToEigen(traj->points[point_num].transforms[0].rotation, trajectory_uav_state_.orientation);
-  trajectory_uav_state_.yaw = std::atan2(2 * (trajectory_uav_state_.orientation.w() * trajectory_uav_state_.orientation.z() +
-                              trajectory_uav_state_.orientation.x() * trajectory_uav_state_.orientation.y()),
-                              1 - 2 * (trajectory_uav_state_.orientation.y() * trajectory_uav_state_.orientation.y() +
-                              trajectory_uav_state_.orientation.z() * trajectory_uav_state_.orientation.z()));
+  // tf::quaternionMsgToEigen(traj->points[point_num].transforms[0].rotation, trajectory_uav_state_.orientation);
+  trajectory_uav_state_.yaw = std::atan2(2.0 * (trajectory_uav_state_.orientation.w() * trajectory_uav_state_.orientation.z() +
+                                         trajectory_uav_state_.orientation.x() * trajectory_uav_state_.orientation.y()),
+                                         1.0 - 2.0 * (trajectory_uav_state_.orientation.y() * trajectory_uav_state_.orientation.y() +
+                                         trajectory_uav_state_.orientation.z() * trajectory_uav_state_.orientation.z()));
   trajectory_uav_state_.yaw_vel = traj->points[point_num].velocities[0].angular.z;
   trajectory_uav_state_.yaw_acc = traj->points[point_num].accelerations[0].angular.z;
+
+  double roll, pitch, yaw;
+  yaw = trajectory_uav_state_.yaw;
+  double a_x_B = trajectory_uav_state_.acceleration[0] * cos(yaw) + trajectory_uav_state_.acceleration[1] * sin(yaw);
+  double a_y_B = trajectory_uav_state_.acceleration[1] * cos(yaw) - trajectory_uav_state_.acceleration[0] * sin(yaw);
+  double a_z_B = trajectory_uav_state_.acceleration[2];
+  roll = atan2(a_y_B, a_z_B + 9.81);
+  pitch = atan2(a_x_B, a_z_B + 9.81);
+  Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+  Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+  trajectory_uav_state_.orientation = rollAngle * yawAngle * pitchAngle;
 };
 
 
@@ -172,6 +183,8 @@ bool RMPPlanner::Follow(){
 }
 
 void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victim_pos){
+  chrono_t1_ = std::chrono::high_resolution_clock::now();
+
   follow_counter_ += 1;
   UAVState follow_uav_state;
   if(follow_counter_ == 1){
@@ -267,12 +280,15 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // create transformer to make transformations between image and world
   Eigen::Affine3d uav_pose;
-  uav_pose.translation() = follow_uav_state.position;
-  uav_pose.linear() = follow_uav_state.orientation.toRotationMatrix();
+  // uav_pose.translation() = follow_uav_state.position;
+  // uav_pose.linear() = follow_uav_state.orientation.toRotationMatrix();
+  uav_pose.translation() = physical_uav_state_.position;                       // to get the world position of the target it makes more sense to take odom instead of old traj
+  uav_pose.linear() = physical_uav_state_.orientation.toRotationMatrix();
   drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
 
   // calculate target position in world frame
   Eigen::Vector3d target_pos = transformer.PosImage2World(detection);
+  ROS_WARN_STREAM(target_pos);
 
   // set target position in world frame for jacobian calculation of both geometries
   task_space_camera_geometry.SetTargetPos(target_pos);
@@ -297,23 +313,20 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       // get roll pitch yaw from acc
       double roll, pitch, yaw;
       yaw = traj_pos[3];
-      double a_x_B = traj_acc[0] * cos(yaw) + traj_acc[1] * sin(yaw);
-      double a_y_B = traj_acc[1] * cos(yaw) - traj_acc[0] * sin(yaw);
-      double a_z_B = traj_acc[2];
-      roll = atan2(a_y_B, a_z_B + 9.81);
-      pitch = atan2(a_x_B, a_z_B + 9.81);
-      // roll = 0;
-      // pitch = 0;
+      roll = 0;
+      pitch = 0;
 
       // define current pose and set transformation matrices new
       Eigen::Affine3d cur_pose;
-      Eigen::AngleAxisd rollAngle((roll * M_PI) / 180, Eigen::Vector3d::UnitX());
-      Eigen::AngleAxisd pitchAngle((pitch * M_PI) / 180, Eigen::Vector3d::UnitY());
-      Eigen::AngleAxisd yawAngle((yaw * M_PI) / 180, Eigen::Vector3d::UnitZ());
+      Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+      Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+      Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+
       cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
       cur_pose.translation()[0] = traj_pos[0];
       cur_pose.translation()[1] = traj_pos[1];
       cur_pose.translation()[2] = traj_pos[2];
+
       transformer.setMatrices(cur_pose);
 
       // update current velocity, TODO: add yaw velocity??
@@ -321,15 +334,27 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       cur_vel[1] = traj_vel[1];
       cur_vel[2] = traj_vel[2];
     }
+    else{
+      Eigen::Quaterniond q = follow_uav_state.orientation;
+      double roll, pitch, yaw;
+      yaw = atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
+                  1.0 - 2.0 * (q.y() * q.y() - q.z() * q.z()));
+      roll = 0;
+      pitch = 0;
+
+      Eigen::Affine3d cur_pose;
+      Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+      Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+      Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+      cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
+      cur_pose.translation() = follow_uav_state.position;
+
+      transformer.setMatrices(cur_pose);
+    }
 
     // get u, v, d and normalization constant for velocity
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
              transformer.PosWorld2Image(target_pos);
-
-    // // calc camera velocity in (u, v)
-    // double u_dot_camera = image_pair.first[0] - u_v[0];
-    // double v_dot_camera = image_pair.first[1] - u_v[1];
-
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
     d[0] = image_pair.first[2];
@@ -351,13 +376,21 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
     this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
 
     // publish acc field and state for analyzation purposes
-    this->publish_analyzation_msg(camera_target_policy.getAccField(), u_v, u_v_dot,
-                                  distance_target_policy.getAccField(), d, d_dot, t);
+    double t_for_msg = victim_pos.header.stamp.toSec() + t;
+    // if(t == 0.0){
+      this->publish_analyzation_msg(camera_target_policy.getAccField(), u_v, u_v_dot,
+                                    distance_target_policy.getAccField(), d, d_dot, t_for_msg);
+    // }
   }
 
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
+
+  chrono_t2_ = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
+  std::cout << "Duration: " << duration << " microseconds" << std::endl;
+
 
   // if distance policy is set, check if distance is reached
   if(A_target_distance(0, 0) > 0){
@@ -420,9 +453,10 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
   acc_msg.x = traj_acc[0];
   acc_msg.y = traj_acc[1];
   acc_msg.z = traj_acc[2];
-  Eigen::Quaterniond quat = Eigen::AngleAxisd(0, Eigen::Vector3d::UnitX()) *
-                            Eigen::AngleAxisd(0, Eigen::Vector3d::UnitY()) *
-                            Eigen::AngleAxisd(traj_pos[3], Eigen::Vector3d::UnitZ());
+  Eigen::AngleAxisd rollAngle(0, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd pitchAngle(0, Eigen::Vector3d::UnitY());
+  Eigen::AngleAxisd yawAngle(traj_pos[3], Eigen::Vector3d::UnitZ());
+  Eigen::Quaterniond quat = rollAngle * yawAngle * pitchAngle;
   quat_msg.x = quat.x();
   quat_msg.y = quat.y();
   quat_msg.z = quat.z();
@@ -437,6 +471,7 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
   geometry_msgs::Transform transform_pos_msg;
   geometry_msgs::Twist twist_vel_msg, twist_acc_msg;
   transform_pos_msg.translation = pos_msg;
+  transform_pos_msg.rotation = quat_msg;
   twist_vel_msg.linear = vel_msg;
   twist_vel_msg.angular = ang_vel_msg;
   twist_acc_msg.linear = acc_msg;

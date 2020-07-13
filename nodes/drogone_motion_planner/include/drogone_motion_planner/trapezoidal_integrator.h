@@ -92,8 +92,6 @@ class TrapezoidalIntegrator {
     acc_a = last_acc_;
     vel_a = current_vel_;
 
-    ROS_WARN_STREAM(last_acc_[0]);
-
     // evaluate policy and get new accelerations
     acc_b1 = policy1_.evaluate(pos_x1_, x1_dot_);
     acc_b2 = policy2_.evaluate(pos_x2_, x2_dot_);
@@ -114,7 +112,7 @@ class TrapezoidalIntegrator {
     current_vel_ = vel_b;
 
     // if we come to a rest, stop integrating
-    if ((acc_b.norm() < 0.01 && current_vel_.norm() < 0.01) ){ // || counter_ > 2500) {
+    if ((acc_b.norm() < 0.01 && current_vel_.norm() < 0.01) ){
       done_ = true;
     }
 

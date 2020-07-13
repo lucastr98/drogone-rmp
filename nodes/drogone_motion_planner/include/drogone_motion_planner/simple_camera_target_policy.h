@@ -21,6 +21,7 @@
 #define RMPCPP_POLICIES_SIMPLE_CAMERA_TARGET_POLICY_H_
 #include <rmpcpp/core/policy_base.h>
 #include <ros/ros.h>
+#include <drogone_msgs_rmp/AccFieldWithState.h>
 namespace rmpcpp {
 
 /**
@@ -51,6 +52,9 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = alpha_ * s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    // std::cout << (alpha_ * s(this->space_->minus(target_, x)) * max_acc_)[0] << " " << ros::Time::now() << std::endl;
+    // std::cout << - (beta_ * x_dot)[0] << " " << ros::Time::now() << std::endl;
+    // std::cout << " " << std::endl;
   }
 
   void updateMaxAcc(double max_acc){
@@ -75,7 +79,7 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
   Vector target_;
   double alpha_{1.0}, beta_{8.0}, c_{0.005};
   double sigma_{sqrt((1024 / 2) * (1024 / 2) + (768 / 2) * (768 / 2))};
-  double max_acc_ = 400;
+  double max_acc_ = 200;
 };
 
 }  // namespace rmpcpp

@@ -19,11 +19,17 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   // define body pose w.r.t. world in correct variables
   double roll_B_W, pitch_B_W, yaw_B_W;
   Eigen::Quaterniond q(uav_pose.linear());
-  roll_B_W = atan2(2.0 * (q.x() * q.y() + q.w() * q.z()),
-                   q.w() * q.w() + q.x() * q.x() - q.y() * q.y() - q.z() * q.z());
-  pitch_B_W = asin(-2.0 * (q.x() * q.z() - q.w() * q.y()));
-  yaw_B_W = atan2(2.0 * (q.y() * q.z() + q.w() * q.x()),
-                  q.w() * q.w() - q.x() * q.x() - q.y() * q.y() + q.z() * q.z());
+  // roll_B_W = atan2(2.0 * (q.x() * q.y() + q.w() * q.z()),
+  //                  q.w() * q.w() + q.x() * q.x() - q.y() * q.y() - q.z() * q.z());
+  // pitch_B_W = asin(-2.0 * (q.x() * q.z() - q.w() * q.y()));
+  // yaw_B_W = atan2(2.0 * (q.y() * q.z() + q.w() * q.x()),
+  //                 q.w() * q.w() - q.x() * q.x() - q.y() * q.y() + q.z() * q.z());
+  roll_B_W = atan2(2.0 * (q.w() * q.x() + q.y() * q.z()),
+                   1.0 - 2.0 * (q.x() * q.x() + q.y() * q.y()));
+  pitch_B_W = 2.0 * (q.w() * q.y() - q.z() * q.x());
+  if(abs(pitch_B_W) >= 1.0){ ROS_WARN_STREAM("TAKE WHOLE DEF FROM WIKI FOR PITCH"); }
+  yaw_B_W = atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
+                  1.0 - 2.0 * (q.y() * q.y() - q.z() * q.z()));
   Eigen::Vector3d t_B_W = uav_pose.translation();
 
   R_C_B_ << cos(pitch_C_B) * cos(yaw_C_B),
