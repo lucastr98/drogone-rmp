@@ -1,7 +1,9 @@
 std_msgs/Header header
-int32 u
-int32 v
-int32 u_dot
-int32 v_dot
-int32 u_dot_C
-int32 v_dot_C
+float32 u_diff
+float32 v_diff
+float32 acc_u_diff
+float32 acc_v_diff
+float32 u_dot
+float32 v_dot
+float32 acc_u_dot
+float32 acc_v_dot

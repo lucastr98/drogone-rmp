@@ -1,4 +1,4 @@
 std_msgs/Header header
 int32 u
 int32 v
-int32 d
+float32 d

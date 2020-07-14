@@ -18,7 +18,6 @@
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <drogone_msgs_rmp/target_detection.h>
-#include <drogone_msgs_rmp/AnalyzePolicy.h>
 #include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldWithState.h>
 

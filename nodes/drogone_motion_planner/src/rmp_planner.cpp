@@ -288,7 +288,6 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // calculate target position in world frame
   Eigen::Vector3d target_pos = transformer.PosImage2World(detection);
-  ROS_WARN_STREAM(target_pos);
 
   // set target position in world frame for jacobian calculation of both geometries
   task_space_camera_geometry.SetTargetPos(target_pos);
