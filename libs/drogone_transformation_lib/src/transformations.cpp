@@ -2,11 +2,12 @@
 
 namespace drogone_transformation_lib{
 
-Transformations::Transformations(PinholeConstants pinhole_constants, CameraMounting camera_mounting, Eigen::Affine3d uav_pose):
-  pinhole_constants_(pinhole_constants),
-  camera_mounting_(camera_mounting){
-    this->setMatrices(uav_pose);
-};
+Transformations::Transformations(){};
+
+void Transformations::setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting){
+  pinhole_constants_ = pinhole_constants;
+  camera_mounting_ = camera_mounting;
+}
 
 void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   // define camera pose w.r.t. body in correct variables
@@ -67,6 +68,10 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   K_(2, 2) = 1;
   K_(0, 2) = pinhole_constants_.u_0;
   K_(1, 2) = pinhole_constants_.v_0;
+  K_(0, 1) = 0.0;
+  K_(1, 0) = 0.0;
+  K_(2, 0) = 0.0;
+  K_(2, 1) = 0.0;
 
   // set up inverse of camera Matrix
   K_inv_(0, 0) = 1 / pinhole_constants_.f_x;
@@ -74,6 +79,10 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   K_inv_(2, 2) = 1;
   K_inv_(0, 2) = -pinhole_constants_.u_0 / pinhole_constants_.f_x;
   K_inv_(1, 2) = -pinhole_constants_.v_0 / pinhole_constants_.f_y;
+  K_inv_(0, 1) = 0.0;
+  K_inv_(1, 0) = 0.0;
+  K_inv_(2, 0) = 0.0;
+  K_inv_(2, 1) = 0.0;
 
   // set uav_position
   uav_pos_ = uav_pose.translation();
@@ -131,6 +140,8 @@ Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d targ
   // calculate velocity in distance
   Eigen::Vector3d connection_vec;
   connection_vec = target_pos_W - uav_pos_;
+  // ROS_WARN_STREAM(target_pos_W);
+  // ROS_WARN_STREAM(uav_pos_);
   double d_dot = -connection_vec.dot(uav_vel);
   Eigen::Matrix<double, 3, 1> image_vel;
   image_vel[0] = u_v_dot_normalized[0];
@@ -141,16 +152,33 @@ Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d targ
 }
 
 Eigen::Vector3d Transformations::PosImage2World(Eigen::Matrix<double, 3, 1> detection){
-  // calculate normed camera x and y
-  Eigen::Matrix<double, 3, 1> xy_C_norm;
-  Eigen::Matrix<double, 3, 1> only_uv;
-  only_uv = detection;
-  only_uv[2] = 1;
-  xy_C_norm = K_inv_ * only_uv;
+  // // calculate normed camera x and y
+  // Eigen::Matrix<double, 3, 1> xy_C_norm;
+  // Eigen::Matrix<double, 3, 1> only_uv;
+  // only_uv = detection;
+  // only_uv[2] = 1;
+  // xy_C_norm = K_inv_ * only_uv;
+  //
+  // // calculate target position in camera frame
+  // Eigen::Vector3d target_C;
+  // target_C = xy_C_norm * detection[2];
 
-  // calculate target position in camera frame
+  double u = detection[0];
+  double v = detection[1];
+  double d = detection[2];
+  double f_x = pinhole_constants_.f_x;
+  double f_y = pinhole_constants_.f_y;
+  double u_0 = pinhole_constants_.u_0;
+  double v_0 = pinhole_constants_.v_0;
+  double z_C_numerator = d;
+  double z_C_denominator = sqrt(((u - u_0) / f_x) * ((u - u_0) / f_x) +
+                                ((v - v_0) / f_x) * ((v - v_0) / f_x) + 1);
+  double z_C = z_C_numerator / z_C_denominator;
+  double x_C = (u - u_0) / f_x * z_C;
+  double y_C = (v - v_0) / f_y * z_C;
+
   Eigen::Vector3d target_C;
-  target_C = xy_C_norm * detection[2];
+  target_C << x_C, y_C, z_C;
 
   // transform target_C to target_W
   Eigen::Affine3d target_pose_W, target_pose_C;

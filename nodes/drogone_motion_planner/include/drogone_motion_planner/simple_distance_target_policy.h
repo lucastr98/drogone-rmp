@@ -51,6 +51,10 @@ class SimpleDistanceTargetPolicy : public PolicyBase<n> {
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = alpha_ * s(this->space_->minus(target_, x)) - beta_ * x_dot;
+    // std::cout << this->space_->minus(target_, x) << std::endl;
+    // std::cout << alpha_ * s(this->space_->minus(target_, x)) << std::endl;
+    // std::cout << - beta_ * x_dot << std::endl;
+    // std::cout << " " << std::endl;
   }
 
   Vector getAccField(){

@@ -55,6 +55,7 @@ DummyDetector::DummyDetector(ros::NodeHandle nh, ros::NodeHandle nh_private):
 
     uav_state_.velocity << 0.0, 0.0, 0.0;
 
+    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_);
 }
 
 // Callback to get current Pose of UAV
@@ -106,8 +107,8 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   Eigen::Affine3d uav_pose;
   uav_pose.translation() = uav_state_.position;
   uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
-  drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
-  Eigen::Matrix<double, 3, 1> detection = transformer.PosWorld2Image(target_pos_W).first;
+  transformer_.setMatrices(uav_pose);
+  Eigen::Matrix<double, 3, 1> detection = transformer_.PosWorld2Image(target_pos_W).first;
 
   // publish (u, v, d)
   this->publish_detection(detection, victim_traj.header.stamp.sec + victim_traj.header.stamp.nsec/1e9);

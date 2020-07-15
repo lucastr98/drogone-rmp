@@ -11,5 +11,7 @@ yaw: 0
 translation: [0.0, 0.0, 0.0]
 
 frequency: 10
-MPC_horizon: 1.0
+MPC_horizon: 2.0
 sampling_interval: 0.01
+
+a_max: 2.0

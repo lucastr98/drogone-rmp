@@ -4,8 +4,8 @@ import matplotlib.patches as mpatches
 import math
 
 # FOR USER TO CHANGE
-z_distance_to_target = 5
-vel_in_x = 1
+z_distance_to_target = 5.5
+vel_in_x = 2
 
 # calculate values of how camera is mounted on drone
 roll_C_B = 0 * np.pi / 180

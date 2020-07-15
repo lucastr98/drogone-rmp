@@ -87,10 +87,12 @@ class RMPPlanner{
     // camera constraints
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
+    drogone_transformation_lib::Transformations transformer_;
 
     uint follow_counter_;
 
     double accuracy_ = 0.3;
+    double a_max_W_;
     double frequency_;
     double MPC_horizon_;
     double sampling_interval_;

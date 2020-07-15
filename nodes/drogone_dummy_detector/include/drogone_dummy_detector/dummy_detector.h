@@ -42,6 +42,8 @@ class DummyDetector{
     drogone_transformation_lib::CameraMounting camera_mounting_;
     double w_;
     double h_;
+
+    drogone_transformation_lib::Transformations transformer_;
 };
 
 } // namespace drogone_motion_planning

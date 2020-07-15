@@ -68,6 +68,12 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
       ROS_ERROR("failed to load sampling_interval");
     }
 
+    if(!nh_private_.getParam("a_max", a_max_W_)){
+      ROS_ERROR("failed to load a_max");
+    }
+
+    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_);
+
     as_.start();
 }
 
@@ -189,11 +195,12 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   UAVState follow_uav_state;
   if(follow_counter_ == 1){
     follow_uav_state = physical_uav_state_;
-    ROS_WARN_STREAM("MP ----- USING PHYSICAL FOR UAV STATE");
+    // ROS_WARN_STREAM("MP ----- USING PHYSICAL FOR UAV STATE");
   }
   else{
     follow_uav_state = trajectory_uav_state_;
-    ROS_WARN_STREAM("MP ----- USING TRAJECTORY FOR UAV STATE");
+    // follow_uav_state = physical_uav_state_;
+    // ROS_WARN_STREAM("MP ----- USING TRAJECTORY FOR UAV STATE");
   }
 
   // store detection
@@ -284,10 +291,10 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   // uav_pose.linear() = follow_uav_state.orientation.toRotationMatrix();
   uav_pose.translation() = physical_uav_state_.position;                       // to get the world position of the target it makes more sense to take odom instead of old traj
   uav_pose.linear() = physical_uav_state_.orientation.toRotationMatrix();
-  drogone_transformation_lib::Transformations transformer(pinhole_constants_, camera_mounting_, uav_pose);
+  transformer_.setMatrices(uav_pose);
 
   // calculate target position in world frame
-  Eigen::Vector3d target_pos = transformer.PosImage2World(detection);
+  Eigen::Vector3d target_pos = transformer_.PosImage2World(detection);
 
   // set target position in world frame for jacobian calculation of both geometries
   task_space_camera_geometry.SetTargetPos(target_pos);
@@ -326,7 +333,7 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       cur_pose.translation()[1] = traj_pos[1];
       cur_pose.translation()[2] = traj_pos[2];
 
-      transformer.setMatrices(cur_pose);
+      transformer_.setMatrices(cur_pose);
 
       // update current velocity, TODO: add yaw velocity??
       cur_vel[0] = traj_vel[0];
@@ -348,12 +355,12 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
       cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
       cur_pose.translation() = follow_uav_state.position;
 
-      transformer.setMatrices(cur_pose);
+      transformer_.setMatrices(cur_pose);
     }
 
     // get u, v, d and normalization constant for velocity
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
-             transformer.PosWorld2Image(target_pos);
+             transformer_.PosWorld2Image(target_pos);
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
     d[0] = image_pair.first[2];
@@ -361,10 +368,18 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
     // get the velocities
     Eigen::Matrix<double, 3, 1> image_vel =
-             transformer.VelWorld2Image(target_pos, cur_vel, vel_normalization);
+             transformer_.VelWorld2Image(target_pos, cur_vel, vel_normalization);
     u_v_dot[0] = image_vel[0];
     u_v_dot[1] = image_vel[1];
     d_dot[0] = image_vel[2];
+
+    // calculate max acc in (u, v) depending on a_max_W, use the function for calc vel bcs it's calculated the same way
+    Eigen::Vector3d cur_max_acc;
+    cur_max_acc << a_max_W_, 0.0, 0.0;
+    Eigen::Matrix<double, 3, 1> image_max_acc =
+             transformer_.VelWorld2Image(target_pos, cur_max_acc, vel_normalization);
+    double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
+    camera_target_policy.updateMaxAcc(a_max_C);
 
     // integrate the policy with the (u, v, d) calculated
     integrator.setX(u_v, u_v_dot, d, d_dot);
@@ -388,7 +403,7 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   chrono_t2_ = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
-  std::cout << "Duration: " << duration << " microseconds" << std::endl;
+  // std::cout << "Duration: " << duration << " microseconds" << std::endl;
 
 
   // if distance policy is set, check if distance is reached

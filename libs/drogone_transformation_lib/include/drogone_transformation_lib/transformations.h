@@ -5,7 +5,8 @@ namespace drogone_transformation_lib{
 
 class Transformations{
   public:
-    Transformations(PinholeConstants pinhole_constants, CameraMounting camera_mounting, Eigen::Affine3d uav_pose);
+    Transformations();
+    void setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting);
     void setMatrices(Eigen::Affine3d uav_pose);
     std::pair<Eigen::Matrix<double, 3, 1>, double> PosWorld2Image(Eigen::Vector3d target_W);
     Eigen::Matrix<double, 3, 1> VelWorld2Image(Eigen::Vector3d target_pos_W, Eigen::Vector3d uav_vel, double normalization);

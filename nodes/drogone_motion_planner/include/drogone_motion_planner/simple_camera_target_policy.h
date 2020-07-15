@@ -51,11 +51,11 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
   SimpleCameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = alpha_ * s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    this->f_ = /*alpha_ **/ s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
   }
 
   void updateMaxAcc(double max_acc){
-    max_acc_ = max_acc_;
+    max_acc_ = max_acc;
   }
 
   Vector getAccField(){
