@@ -20,13 +20,16 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     // publisher for f_u_v for visualization
     pub_analyzation_ = nh_.advertise<drogone_msgs_rmp::AccFieldWithState>("acc_field_analyzation", 0);
 
+    // // publisher for image acc plotting
+    // new_temporary_pub_ = nh_.advertise<geometry_msgs::PoseArray>("plot_image_acc", 0);
+
     // subscriber to Odometry for physical uav state
     sub_odom_ =
         nh_.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
 
     // subscriber to Trajectory for trajectory uav state
     sub_traj_ =
-        nh_.subscribe("/peregrine/command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
+        nh_.subscribe("command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
 
     // load params
     if(!nh_private_.getParam("f_x", pinhole_constants_.f_x)){
@@ -57,6 +60,16 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
       ROS_ERROR("failed to load translation.");
     }
     camera_mounting_.translation << cam_trans[0], cam_trans[1], cam_trans[2];
+
+    if(!nh_private_.getParam("A_d", A_d_)){
+      ROS_ERROR("failed to load A_d");
+    }
+    if(!nh_private_.getParam("A_u", A_u_)){
+      ROS_ERROR("failed to load A_u");
+    }
+    if(!nh_private_.getParam("A_v", A_v_)){
+      ROS_ERROR("failed to load A_v");
+    }
 
     if(!nh_private_.getParam("frequency", frequency_)){
       ROS_ERROR("failed to load frequency");
@@ -237,9 +250,13 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   Eigen::Matrix<double, task_space_distance_dimension, 1> distance_target;
   distance_target[0] = 2;
   double distance_alpha, distance_beta, distance_c;
-  distance_alpha = 1.0;
-  distance_beta = 2.0;
-  distance_c = 0.005;
+  // distance_alpha = 1.0;
+  // distance_beta = 3.0;
+  distance_alpha = 3;
+  // distance_alpha = a_max_W_;
+  distance_beta = 0.2 * distance_alpha;
+  // distance_beta = 1.5 * distance_alpha;
+  distance_c = 0.5;
   rmpcpp::SimpleDistanceTargetPolicy<task_space_distance_dimension> distance_target_policy(distance_target, distance_alpha, distance_beta, distance_c);
 
   // create metrics for the target policies
@@ -247,10 +264,10 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   distance_geometry::MatrixX A_target_distance(distance_geometry::MatrixX::Zero());
 
   // fill the metrics and set them in the policies
-  A_target_camera(0, 0) = 1.0;
-  A_target_camera(1, 1) = 1.0;
-  camera_target_policy.setA(A_target_camera);
-  A_target_distance(0, 0) = 1.0;
+  // A_target_camera(0, 0) = 1.0;
+  // A_target_camera(1, 1) = 1.0;
+  // camera_target_policy.setA(A_target_camera);
+  A_target_distance(0, 0) = A_d_;
   distance_target_policy.setA(A_target_distance);
 
   // add the policies into the container
@@ -381,6 +398,16 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
     double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
     camera_target_policy.updateMaxAcc(a_max_C);
 
+    // calculate divider for A metric of camera depending on distance
+    Eigen::Vector3d one;
+    one << 1.0, 0.0, 0.0;
+    Eigen::Matrix<double, 3, 1> divider_vec =
+             transformer_.VelWorld2Image(target_pos, cur_max_acc, vel_normalization);
+    double divider = sqrt(divider_vec[0] * divider_vec[0] + divider_vec[1] * divider_vec[1]);
+    A_target_camera(0, 0) = A_u_ / divider;
+    A_target_camera(1, 1) = A_v_ / divider;
+    camera_target_policy.setA(A_target_camera);
+
     // integrate the policy with the (u, v, d) calculated
     integrator.setX(u_v, u_v_dot, d, d_dot);
     integrator.forwardIntegrate(sampling_interval_);
@@ -391,10 +418,9 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
     // publish acc field and state for analyzation purposes
     double t_for_msg = victim_pos.header.stamp.toSec() + t;
-    // if(t == 0.0){
-      this->publish_analyzation_msg(camera_target_policy.getAccField(), u_v, u_v_dot,
-                                    distance_target_policy.getAccField(), d, d_dot, t_for_msg);
-    // }
+
+    this->publish_analyzation_msg(camera_target_policy.getAccField(), u_v, u_v_dot,
+                                  distance_target_policy.getAccField(), d, d_dot, t_for_msg);
   }
 
   // publish trajectory
@@ -408,24 +434,24 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
 
   // if distance policy is set, check if distance is reached
   if(A_target_distance(0, 0) > 0){
-    Eigen::Vector3d goal_pos, end_pos;
-    goal_pos = target_pos;
-    goal_pos[2] -= distance_target[0];
-    end_pos[0] = traj_pos[0];
-    end_pos[1] = traj_pos[1];
-    end_pos[2] = traj_pos[2];
-    double diff = (goal_pos - end_pos).norm();
-    // if distance is reached by the end of current traj stop sub and wait until traj is flown
-    if(diff < 0.1){
-      ros::Duration(t).sleep();
-
-      // take ownership of the mutex (unlock mutex from the lock in Follow())
-      std::lock_guard<std::mutex> guard(mutex_);
-      // notify the condition variable to stop waiting (in Follow())
-      cond_var_.notify_one();
-      // stop subscriber
-      sub_follow_.shutdown();
-    }
+    // Eigen::Vector3d goal_pos, end_pos;
+    // goal_pos = target_pos;
+    // goal_pos[2] -= distance_target[0];
+    // end_pos[0] = traj_pos[0];
+    // end_pos[1] = traj_pos[1];
+    // end_pos[2] = traj_pos[2];
+    // double diff = (goal_pos - end_pos).norm();
+    // // if distance is reached by the end of current traj stop sub and wait until traj is flown
+    // if(diff < 0.1){
+    //   ros::Duration(t).sleep();
+    //
+    //   // take ownership of the mutex (unlock mutex from the lock in Follow())
+    //   std::lock_guard<std::mutex> guard(mutex_);
+    //   // notify the condition variable to stop waiting (in Follow())
+    //   cond_var_.notify_one();
+    //   // stop subscriber
+    //   sub_follow_.shutdown();
+    // }
   }
   else{
     // if distance policy isn't set wait 20s before stopping replanning

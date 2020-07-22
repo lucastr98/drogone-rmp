@@ -1,5 +1,5 @@
 <launch>
-    <arg name="mav_name" default="peregrine"/>
+    <arg name="mav_name" default="firefly"/>
     <arg name="log_file" default="$(arg mav_name)" />
 
     <!-- launch simulation (rviz and gazebo) -->

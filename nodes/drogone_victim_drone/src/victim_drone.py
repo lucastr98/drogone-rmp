@@ -64,7 +64,7 @@ class VictimDrone(object):
         #------------------------------------random path---------------------------------------------
         #parameters of random path, smooth path 0.5 and 0.8, aggressive 1.0 amd 1.5
         self.theta_spread = self.velocity * 0.5 #** #half of the angle interval width in degrees for new angle/ smooth path 0.5, aggressive 1.0
-        self.phi_spread = self.velocity * 0.8 #** #half of the angle interval width in degrees for new angle/ smooth path 0.8, aggressive 1.5
+        self.phi_spread = self.velocity * 1.5 #** #half of the angle interval width in degrees for new angle/ smooth path 0.8, aggressive 1.5
         self.stay_inside = 1 #** #set to zero, if random path should also be continued outside the arena (make sure that theta and phi spread have same value)
         self.smooth = 1 #**  #when drone leaves the frame, should return path be smooth (=1)or more aggressive (=0)
         #if drone should stay inside certain frame (stay inside == 1), default values for rviz arena frame are x=35, y=20, z_max=40, z_min=6
@@ -434,7 +434,7 @@ class VictimDrone(object):
         victim_pose = PoseStamped()
         victim_pose.pose.position.x = current_pose.pose.position.x + ds * math.sin(theta_new) * math.cos(phi_new)
         victim_pose.pose.position.y = current_pose.pose.position.y + ds * math.sin(theta_new) * math.sin(phi_new)
-        victim_pose.pose.position.z = current_pose.pose.position.z + ds * math.cos(theta_new)
+        victim_pose.pose.position.z = current_pose.pose.position.z #+ ds * math.cos(theta_new)
 
         #calculate new velocity by transfroming spherical coordinates back to cartesian coordinates
         victim_twist = Twist()

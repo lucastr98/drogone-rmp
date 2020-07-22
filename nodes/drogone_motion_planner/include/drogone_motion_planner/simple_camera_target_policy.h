@@ -54,6 +54,22 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
     this->f_ = /*alpha_ **/ s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
   }
 
+  std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
+    std::vector<Eigen::Matrix<double, 2, 1>> the_returner;
+    for(int i = -1024; i <= 1024; i += 64){
+      for(int j = -768; j <= 768; j += 64){
+        Eigen::Matrix<double, 2, 1> x, x_dot;
+        x(0, 0) = i;
+        x(1, 0) = j;
+        x_dot(0, 0) = 0;
+        x_dot(1, 0) = 0;
+        this->setState(x, x_dot);
+        the_returner.push_back(this->f_);
+      }
+    }
+    return the_returner;
+  }
+
   void updateMaxAcc(double max_acc){
     max_acc_ = max_acc;
   }

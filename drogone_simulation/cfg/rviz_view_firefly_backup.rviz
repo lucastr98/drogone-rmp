@@ -6,8 +6,9 @@ Panels:
       Expanded:
         - /TF1/Frames1
         - /TF1/Tree1
-        - /DroGone Path1
-      Splitter Ratio: 0.6143187284469604
+        - /Victim Drone1/Shape1
+        - /RobotModel1/Links1
+      Splitter Ratio: 0.5050651431083679
     Tree Height: 736
   - Class: rviz/Selection
     Name: Selection
@@ -66,12 +67,12 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
+        firefly/ball:
+          Value: false
         firefly/base_link:
           Value: true
         firefly/base_link_inertia:
           Value: false
-        firefly/gps_link:
-          Value: true
         firefly/imu_link:
           Value: false
         firefly/imugt_link:
@@ -81,6 +82,8 @@ Visualization Manager:
         firefly/odometry_sensor1_link:
           Value: false
         firefly/odometry_sensorgt_link:
+          Value: false
+        firefly/rod:
           Value: false
         firefly/rotor_0:
           Value: false
@@ -106,8 +109,6 @@ Visualization Manager:
           firefly/base_link:
             firefly/base_link_inertia:
               {}
-            firefly/gps_link:
-              {}
             firefly/imu_link:
               {}
             firefly/imugt_link:
@@ -116,6 +117,9 @@ Visualization Manager:
               {}
             firefly/odometry_sensorgt_link:
               {}
+            firefly/rod:
+              firefly/ball:
+                {}
             firefly/rotor_0:
               {}
             firefly/rotor_1:
@@ -226,16 +230,55 @@ Visualization Manager:
       Topic: /visualization/path_victim
       Unreliable: false
       Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 1
+          Value: true
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: false
+      Enabled: true
+      Keep: 1
+      Name: Victim Drone
+      Position Tolerance: 0.10000000149011612
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 25; 255; 0
+        Head Length: 0.699999988079071
+        Head Radius: 0.699999988079071
+        Shaft Length: 0
+        Shaft Radius: 0
+        Value: Arrow
+      Topic: /victim_drone/odometry
+      Unreliable: false
+      Value: true
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: false
       Enabled: true
       Links:
-        All Links Enabled: true
+        All Links Enabled: false
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
+        firefly/ball:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: false
         firefly/base_link:
           Alpha: 1
           Show Axes: false
@@ -245,10 +288,6 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        firefly/gps_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
         firefly/imu_link:
           Alpha: 1
           Show Axes: false
@@ -265,6 +304,11 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
+        firefly/rod:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: false
         firefly/rotor_0:
           Alpha: 1
           Show Axes: false
@@ -302,7 +346,7 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Alpha: 1
-      Buffer Length: 5000
+      Buffer Length: 50
       Class: rviz/Path
       Color: 225; 25; 0
       Enabled: true
@@ -323,73 +367,6 @@ Visualization Manager:
       Shaft Length: 0.10000000149011612
       Topic: /visualization/path_drogone
       Unreliable: false
-      Value: true
-    - Alpha: 1
-      Buffer Length: 1
-      Class: rviz/Path
-      Color: 1; 255; 255
-      Enabled: false
-      Head Diameter: 0.30000001192092896
-      Head Length: 0.20000000298023224
-      Length: 0.30000001192092896
-      Line Style: Lines
-      Line Width: 0.029999999329447746
-      Name: Tracker Path
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Pose Color: 255; 85; 255
-      Pose Style: None
-      Radius: 0.029999999329447746
-      Shaft Diameter: 0.10000000149011612
-      Shaft Length: 0.10000000149011612
-      Topic: /visualization/tracker_path
-      Unreliable: false
-      Value: false
-    - Alpha: 1
-      Arrow Length: 0.30000001192092896
-      Axes Length: 0.30000001192092896
-      Axes Radius: 0.009999999776482582
-      Class: rviz/PoseArray
-      Color: 1; 255; 255
-      Enabled: true
-      Head Length: 0
-      Head Radius: 0
-      Name: Tracker Poses
-      Shaft Length: 0.07000000029802322
-      Shaft Radius: 0.20000000298023224
-      Shape: Arrow (3D)
-      Topic: /visualization/tracker_poses
-      Unreliable: false
-      Value: true
-    - Alpha: 1
-      Class: rviz/PointStamped
-      Color: 204; 41; 204
-      Enabled: true
-      History Length: 1
-      Name: Intersection point of Trajectories
-      Radius: 0.3499999940395355
-      Topic: /visualization/intersection_point
-      Unreliable: false
-      Value: true
-    - Alpha: 1
-      Class: rviz/PointStamped
-      Color: 25; 255; 0
-      Enabled: true
-      History Length: 1
-      Name: Victim Drone Position
-      Radius: 0.5
-      Topic: /visualization/victim_position
-      Unreliable: false
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /firefly/predicted_state
-      Name: Marker
-      Namespaces:
-        {}
-      Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
@@ -419,25 +396,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 76.14244079589844
+      Distance: 13.467429161071777
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.3129127323627472
-        Y: 11.301697731018066
-        Z: 15.661294937133789
-      Focal Shape Fixed Size: false
+        X: -0.9915173053741455
+        Y: 4.084079742431641
+        Z: 2.4493343830108643
+      Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.03539855033159256
+      Pitch: 0.224796861410141
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 4.70540189743042
+      Yaw: 5.937945365905762
     Saved: ~
 Window Geometry:
   Displays:

@@ -20,6 +20,7 @@
 #include <drogone_msgs_rmp/target_detection.h>
 #include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldWithState.h>
+#include <geometry_msgs/PoseArray.h>
 
 namespace drogone_rmp_planner {
 
@@ -70,6 +71,7 @@ class RMPPlanner{
     ros::Publisher pub_pose_;
     ros::Publisher pub_analyzation_;
     ros::Publisher pub_analyzation_policy_;
+    ros::Publisher new_temporary_pub_;
     ros::Subscriber sub_odom_;
     ros::Subscriber sub_traj_;
     ros::Subscriber sub_follow_;
@@ -88,6 +90,11 @@ class RMPPlanner{
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
     drogone_transformation_lib::Transformations transformer_;
+
+    // metrics
+    double A_d_;
+    double A_u_;
+    double A_v_;
 
     uint follow_counter_;
 

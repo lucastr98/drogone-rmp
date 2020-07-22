@@ -32,5 +32,6 @@
   <depend>drogone_transformation_lib</depend>
 
   <depend>rmpcpp</depend>
+  <depend>rmpcpp_ros</depend>
 
 </package>

@@ -99,7 +99,7 @@ class TrapezoidalIntegrator {
     pol_vec.push_back(acc_b1);
     pol_vec.push_back(acc_b2);
     acc_b_sum = PolicyBaseQ::sum(pol_vec);
-    acc_b = acc_b_sum();
+    acc_b = acc_b_sum.getf();
 
     // trapezoidal integration of acceleration.
     vel_b = vel_a + ((b - a) * (acc_a + acc_b) / 2.0);
