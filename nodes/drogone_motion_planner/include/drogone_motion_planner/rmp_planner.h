@@ -12,8 +12,11 @@
 #include <drogone_action_rmp/FSMAction.h>
 #include <drogone_motion_planner/cart_cam_geom.h>
 #include <drogone_motion_planner/distance_geom.h>
+#include <drogone_motion_planner/x_geom.h>
+#include <drogone_motion_planner/y_geom.h>
 #include <drogone_motion_planner/simple_camera_target_policy.h>
 #include <drogone_motion_planner/simple_distance_target_policy.h>
+#include <drogone_motion_planner/simple_xy_target_policy.h>
 #include <drogone_motion_planner/trapezoidal_integrator.h>
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
