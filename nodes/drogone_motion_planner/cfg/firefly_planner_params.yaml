@@ -10,9 +10,9 @@ pitch: 0
 yaw: 0
 translation: [0.0, 0.0, 0.0]
 
-A_d: 2.0
-A_u: 1.0
-A_v: 1.0
+a_d: 2.0
+a_u: 1.0
+a_v: 1.0
 
 frequency: 10
 MPC_horizon: 2.0

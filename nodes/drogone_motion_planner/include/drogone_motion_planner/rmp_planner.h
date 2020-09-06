@@ -35,6 +35,12 @@ struct UAVState {
   double yaw_acc;
 };
 
+struct DetectorInfo {
+  double u;
+  double v;
+  double d;
+};
+
 class RMPPlanner{
   public:
     RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private);
@@ -46,6 +52,7 @@ class RMPPlanner{
     bool TakeOff();
     bool Follow();
     void follow_callback(const drogone_msgs_rmp::target_detection& victim_pos);
+    void planTrajectory();
     bool Land();
 
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
@@ -83,18 +90,33 @@ class RMPPlanner{
     // flight state of the drone
     UAVState physical_uav_state_;
     UAVState trajectory_uav_state_;
+    UAVState planning_uav_state_;
     bool first_odom_cb_;
     double old_stamp_;
+    ros::Time time_of_last_detection_;
+
+    // parameters that are changed depending on which state the uav is in
+    double u_target_;
+    double v_target_;
+    double d_target_;
+    double uv_alpha_;
+    double uv_beta_;
+    double uv_c_;
+    double d_alpha_;
+    double d_beta_;
+    double d_c_;
 
     // camera constraints
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
     drogone_transformation_lib::Transformations transformer_;
 
+    DetectorInfo detection_;
+
     // metrics
-    double A_d_;
-    double A_u_;
-    double A_v_;
+    double a_d_;
+    double a_u_;
+    double a_v_;
 
     uint follow_counter_;
 

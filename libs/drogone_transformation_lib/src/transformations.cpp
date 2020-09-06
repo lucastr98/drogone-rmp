@@ -20,11 +20,6 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   // define body pose w.r.t. world in correct variables
   double roll_B_W, pitch_B_W, yaw_B_W;
   Eigen::Quaterniond q(uav_pose.linear());
-  // roll_B_W = atan2(2.0 * (q.x() * q.y() + q.w() * q.z()),
-  //                  q.w() * q.w() + q.x() * q.x() - q.y() * q.y() - q.z() * q.z());
-  // pitch_B_W = asin(-2.0 * (q.x() * q.z() - q.w() * q.y()));
-  // yaw_B_W = atan2(2.0 * (q.y() * q.z() + q.w() * q.x()),
-  //                 q.w() * q.w() - q.x() * q.x() - q.y() * q.y() + q.z() * q.z());
   roll_B_W = atan2(2.0 * (q.w() * q.x() + q.y() * q.z()),
                    1.0 - 2.0 * (q.x() * q.x() + q.y() * q.y()));
   pitch_B_W = 2.0 * (q.w() * q.y() - q.z() * q.x());
@@ -150,17 +145,6 @@ Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d targ
 }
 
 Eigen::Vector3d Transformations::PosImage2World(Eigen::Matrix<double, 3, 1> detection){
-  // // calculate normed camera x and y
-  // Eigen::Matrix<double, 3, 1> xy_C_norm;
-  // Eigen::Matrix<double, 3, 1> only_uv;
-  // only_uv = detection;
-  // only_uv[2] = 1;
-  // xy_C_norm = K_inv_ * only_uv;
-  //
-  // // calculate target position in camera frame
-  // Eigen::Vector3d target_C;
-  // target_C = xy_C_norm * detection[2];
-
   double u = detection[0];
   double v = detection[1];
   double d = detection[2];
