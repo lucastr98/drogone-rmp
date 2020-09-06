@@ -73,6 +73,12 @@ class TrapezoidalIntegrator {
     x2_dot_ = x2_dot;
   }
 
+  void setPercentages(double a_u, double a_v, double a_d){
+    double a_complete = (a_u + a_v) / 2 + a_d;
+    percentages_.push_back((a_u + a_v) / 2 / a_complete);
+    percentages_.push_back(a_d / a_complete);
+  }
+
   /**
    * Advance by dt and return position in configuration space.
    */
@@ -98,7 +104,8 @@ class TrapezoidalIntegrator {
     std::vector<PolicyBaseQ> pol_vec;
     pol_vec.push_back(acc_b1);
     pol_vec.push_back(acc_b2);
-    acc_b_sum = PolicyBaseQ::sum(pol_vec);
+    // acc_b_sum = PolicyBaseQ::sum(pol_vec);
+    acc_b_sum = PolicyBaseQ::new_sum(pol_vec, percentages_);
     acc_b = acc_b_sum.getf();
 
     // trapezoidal integration of acceleration.
@@ -150,6 +157,7 @@ class TrapezoidalIntegrator {
   Vector_x2 x2_dot_{Vector_x2::Zero()};
   Vector_q last_acc_{Vector_q::Zero()};
   uint counter_ = 0;
+  std::vector<double> percentages_;
 };
 
 }  // namespace rmpcpp

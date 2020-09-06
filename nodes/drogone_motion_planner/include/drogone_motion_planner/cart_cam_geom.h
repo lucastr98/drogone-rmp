@@ -51,8 +51,8 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     // std::cout << "Jacobian (camera): " << mtx_j(0, 0) << ", " << mtx_j(0, 1) << ", " << mtx_j(0, 2) << ", " << mtx_j(0, 3) << ", "
     // << mtx_j(1, 0) << ", " << mtx_j(1, 1) << ", " << mtx_j(1, 2) << ", " << mtx_j(1, 3) << std::endl;
 
-    // mtx_j(0, 2) = 0;
-    // mtx_j(1, 2) = 0;
+    mtx_j(0, 3) = 0;
+    mtx_j(1, 3) = 0;
 
     return mtx_j;
   }

@@ -52,6 +52,7 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = /*alpha_ **/ s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    std::cout << "camera f: " << this->f_ << std::endl;
   }
 
   std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
