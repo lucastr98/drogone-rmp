@@ -13,6 +13,7 @@ translation: [0.0, 0.0, 0.0]
 a_d: 2.0
 a_u: 1.0
 a_v: 1.0
+a_d2g: 0.0
 
 frequency: 10
 MPC_horizon: 2.0

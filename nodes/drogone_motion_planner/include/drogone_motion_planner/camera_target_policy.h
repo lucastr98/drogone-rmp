@@ -17,8 +17,8 @@
  * along with RMPCPP. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef RMPCPP_POLICIES_SIMPLE_CAMERA_TARGET_POLICY_H_
-#define RMPCPP_POLICIES_SIMPLE_CAMERA_TARGET_POLICY_H_
+#ifndef RMPCPP_POLICIES_CAMERA_TARGET_POLICY_H_
+#define RMPCPP_POLICIES_CAMERA_TARGET_POLICY_H_
 #include <rmpcpp/core/policy_base.h>
 #include <ros/ros.h>
 #include <drogone_msgs_rmp/AnalyzePolicy.h>
@@ -29,7 +29,7 @@ namespace rmpcpp {
  * \tparam n Dimensionality of geometry
  */
 template <int n>
-class SimpleCameraTargetPolicy : public PolicyBase<n> {
+class CameraTargetPolicy : public PolicyBase<n> {
   using Vector = typename PolicyBase<n>::Vector;
   using Matrix = typename PolicyBase<n>::Matrix;
 
@@ -40,15 +40,15 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
    * A is the metric to be used.
    * alpha, beta and c are tuning parameters.
    */
-  SimpleCameraTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
+  CameraTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
       : target_(target), alpha_(alpha), beta_(beta), c_(c) {
     this->A_ = A;
   }
 
-  SimpleCameraTargetPolicy(Vector target, double alpha, double beta, double c)
+  CameraTargetPolicy(Vector target, double alpha, double beta, double c)
       : target_(target), alpha_(alpha), beta_(beta), c_(c) {}
 
-  SimpleCameraTargetPolicy(Vector target) : target_(target) {}
+  CameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = /*alpha_ **/ s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
@@ -97,4 +97,4 @@ class SimpleCameraTargetPolicy : public PolicyBase<n> {
 
 }  // namespace rmpcpp
 
-#endif  // RMPCPP_POLICIES_SIMPLE_TARGET_POLICY_H_
+#endif  // RMPCPP_POLICIES_TARGET_POLICY_H_

@@ -32,7 +32,7 @@ namespace rmpcpp {
  * \tparam TGeometry1 Geometry on which the integrator operates.
  *                   Has to be inherited from GeometryBase.
  */
-template <class TGeometry1, class TGeometry2>
+template <class TGeometry1, class TGeometry2, class TGeometry3>
 class TrapezoidalIntegrator {
  public:
   static_assert(std::is_base_of<GeometryBase<TGeometry1::K, TGeometry1::D>, TGeometry1>::value,
@@ -42,6 +42,8 @@ class TrapezoidalIntegrator {
   using Matrix_x1 = typename TGeometry1::MatrixX;
   using Vector_x2 = typename TGeometry2::VectorX;
   using Matrix_x2 = typename TGeometry2::MatrixX;
+  using Vector_x3 = typename TGeometry3::VectorX;
+  using Matrix_x3 = typename TGeometry3::MatrixX;
   using Vector_q = typename TGeometry1::VectorQ;
   using Matrix_q = typename TGeometry1::MatrixQ;
   using PolicyBaseQ = PolicyBase<TGeometry1::D>;
@@ -49,9 +51,10 @@ class TrapezoidalIntegrator {
   /**
    * Constructor to supply a policycontainer.
    */
-  TrapezoidalIntegrator(PolicyContainer<TGeometry1> &policy1, PolicyContainer<TGeometry2> &policy2):
+  TrapezoidalIntegrator(PolicyContainer<TGeometry1> &policy1, PolicyContainer<TGeometry2> &policy2, PolicyContainer<TGeometry3> &policy3):
     policy1_(policy1),
-    policy2_(policy2) {}
+    policy2_(policy2),
+    policy3_(policy3) {}
 
   /**
    *  Reset integrator to a specific state.
@@ -66,17 +69,21 @@ class TrapezoidalIntegrator {
   }
 
   void setX(const Vector_x1 pos_x1, Vector_x1 x1_dot,
-            const Vector_x2 pos_x2, Vector_x2 x2_dot){
+            const Vector_x2 pos_x2, Vector_x2 x2_dot,
+            const Vector_x3 pos_x3, Vector_x3 x3_dot){
     pos_x1_ = pos_x1;
     x1_dot_ = x1_dot;
     pos_x2_ = pos_x2;
     x2_dot_ = x2_dot;
+    pos_x3_ = pos_x3;
+    x3_dot_ = x3_dot;
   }
 
-  void setPercentages(double a_u, double a_v, double a_d){
-    double a_complete = (a_u + a_v) / 2 + a_d;
+  void setPercentages(double a_u, double a_v, double a_d, double a_d2g){
+    double a_complete = (a_u + a_v) / 2 + a_d + a_d2g;
     percentages_.push_back((a_u + a_v) / 2 / a_complete);
     percentages_.push_back(a_d / a_complete);
+    percentages_.push_back(a_d2g / a_complete);
   }
 
   /**
@@ -92,7 +99,7 @@ class TrapezoidalIntegrator {
     const float b = dt;
 
     // get position in manifold
-    PolicyBaseQ acc_b1, acc_b2, acc_b_sum;
+    PolicyBaseQ acc_b1, acc_b2, acc_b3, acc_b_sum;
     Vector_q acc_b, vel_b, acc_a, vel_a;
     Vector_q dist_increment;
     acc_a = last_acc_;
@@ -101,9 +108,11 @@ class TrapezoidalIntegrator {
     // evaluate policy and get new accelerations
     acc_b1 = policy1_.evaluate(pos_x1_, x1_dot_);
     acc_b2 = policy2_.evaluate(pos_x2_, x2_dot_);
+    acc_b3 = policy3_.evaluate(pos_x3_, x3_dot_);
     std::vector<PolicyBaseQ> pol_vec;
     pol_vec.push_back(acc_b1);
     pol_vec.push_back(acc_b2);
+    pol_vec.push_back(acc_b3);
     // acc_b_sum = PolicyBaseQ::sum(pol_vec);
     acc_b_sum = PolicyBaseQ::new_sum(pol_vec, percentages_);
     acc_b = acc_b_sum.getf();
@@ -147,6 +156,7 @@ class TrapezoidalIntegrator {
  private:
   PolicyContainer<TGeometry1> &policy1_;
   PolicyContainer<TGeometry2> &policy2_;
+  PolicyContainer<TGeometry3> &policy3_;
   bool done_{false};
   double distance_{0.0};
   Vector_q current_pos_{Vector_q::Zero()};
@@ -155,6 +165,8 @@ class TrapezoidalIntegrator {
   Vector_x1 x1_dot_{Vector_x1::Zero()};
   Vector_x2 pos_x2_{Vector_x2::Zero()};
   Vector_x2 x2_dot_{Vector_x2::Zero()};
+  Vector_x2 pos_x3_{Vector_x3::Zero()};
+  Vector_x2 x3_dot_{Vector_x3::Zero()};
   Vector_q last_acc_{Vector_q::Zero()};
   uint counter_ = 0;
   std::vector<double> percentages_;

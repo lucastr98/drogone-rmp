@@ -61,6 +61,9 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     if(!nh_private_.getParam("a_d", a_d_)){
       ROS_ERROR("failed to load a_d");
     }
+    if(!nh_private_.getParam("a_d2g", a_d2g_)){
+      ROS_ERROR("failed to load a_d2g");
+    }
     if(!nh_private_.getParam("a_u", a_u_)){
       ROS_ERROR("failed to load a_u");
     }
@@ -241,6 +244,11 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   d_beta_ = 0.2 * d_alpha_;
   d_c_ = 0.5;
   // a_d_ = a_d_;
+  d2g_target_ = 2.0;
+  d2g_alpha_ = 3;
+  d2g_beta_ = 0.2 * d2g_alpha_;
+  d2g_c_ = 0.5;
+  // a_d2g_ = a_d2g_;
 
   this->planTrajectory();
 }
@@ -251,42 +259,57 @@ void RMPPlanner::planTrajectory(){
   // define geometries
   using camera_geometry = rmpcpp::CartesianCameraGeometry;
   using distance_geometry = rmpcpp::DistanceGeometry;
+  using distance2ground_geometry = rmpcpp::Distance2GroundGeometry;
 
   // create a variables for the task space geometries
   camera_geometry task_space_camera_geometry;
   distance_geometry task_space_distance_geometry;
+  distance2ground_geometry task_space_distance2ground_geometry;
 
   // create containers for policies in the same geometry of the task spaces
   rmpcpp::PolicyContainer<camera_geometry> camera_container(task_space_camera_geometry);
   rmpcpp::PolicyContainer<distance_geometry> distance_container(task_space_distance_geometry);
+  rmpcpp::PolicyContainer<distance2ground_geometry> distance2ground_container(task_space_distance2ground_geometry);
 
-  // create simple target policy in camera task space
+  // create target policy in camera task space
   const int task_space_camera_dimension = camera_geometry::K;
   Eigen::Matrix<double, task_space_camera_dimension, 1> camera_target;
   camera_target[0] = u_target_;
   camera_target[1] = v_target_;
-  rmpcpp::SimpleCameraTargetPolicy<task_space_camera_dimension> camera_policy(camera_target, uv_alpha_, uv_beta_, uv_c_);
+  rmpcpp::CameraTargetPolicy<task_space_camera_dimension> camera_policy(camera_target, uv_alpha_, uv_beta_, uv_c_);
 
-  // create simple target policy in distance task space
+  // create target policy in distance task space
   const int task_space_distance_dimension = distance_geometry::K;
   Eigen::Matrix<double, task_space_distance_dimension, 1> distance_target;
   distance_target[0] = d_target_;
-  rmpcpp::SimpleDistanceTargetPolicy<task_space_distance_dimension> distance_policy(distance_target, d_alpha_, d_beta_, d_c_);
+  rmpcpp::DistanceTargetPolicy<task_space_distance_dimension> distance_policy(distance_target, d_alpha_, d_beta_, d_c_);
+
+  // create target policy in distance2ground task space
+  const int task_space_distance2ground_dimension = distance2ground_geometry::K;
+  Eigen::Matrix<double, task_space_distance2ground_dimension, 1> distance2ground_target;
+  distance2ground_target[0] = d2g_target_;
+  rmpcpp::Distance2GroundTargetPolicy<task_space_distance2ground_dimension> distance2ground_policy(distance2ground_target, d2g_alpha_, d2g_beta_, d2g_c_);
 
   // create metrics for the target policies
   camera_geometry::MatrixX A_camera(camera_geometry::MatrixX::Zero());
   distance_geometry::MatrixX A_distance(distance_geometry::MatrixX::Zero());
+  distance2ground_geometry::MatrixX A_distance2ground(distance2ground_geometry::MatrixX::Zero());
 
-  // fill the metric for the distancce policy, as it stays the same
+  // fill the metric for the distance policy, as it stays the same
   A_distance(0, 0) = a_d_;
   distance_policy.setA(A_distance);
+
+  // fill the metric for the distance policy, as it stays the same
+  A_distance2ground(0, 0) = a_d2g_;
+  distance2ground_policy.setA(A_distance2ground);
 
   // add the policies into the container
   camera_container.addPolicy(&camera_policy);
   distance_container.addPolicy(&distance_policy);
+  distance2ground_container.addPolicy(&distance2ground_policy);
 
   // create a trapezoidal integrator with the containers
-  rmpcpp::TrapezoidalIntegrator<camera_geometry, distance_geometry> integrator(camera_container, distance_container);
+  rmpcpp::TrapezoidalIntegrator<camera_geometry, distance_geometry, distance2ground_geometry> integrator(camera_container, distance_container, distance2ground_container);
 
   // reset integrator with current pos and vel for x, y, z, yaw
   const int config_space_dimension = camera_geometry::D;
@@ -337,6 +360,7 @@ void RMPPlanner::planTrajectory(){
   Eigen::Matrix<double, config_space_dimension, 1> traj_pos, traj_vel, traj_acc;
   Eigen::Matrix<double, task_space_camera_dimension, 1> u_v, u_v_dot;
   Eigen::Matrix<double, task_space_distance_dimension, 1> d, d_dot;
+  Eigen::Matrix<double, task_space_distance2ground_dimension, 1> d2g, d2g_dot;
   Eigen::Affine3d cur_pose;
   Eigen::Vector3d cur_vel = planning_uav_state_.velocity;
 
@@ -417,8 +441,8 @@ void RMPPlanner::planTrajectory(){
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
 
-    integrator.setX(u_v, u_v_dot, d, d_dot);
-    integrator.setPercentages(a_u_, a_v_, a_d_);
+    integrator.setX(u_v, u_v_dot, d, d_dot, d2g, d2g_dot);
+    integrator.setPercentages(a_u_, a_v_, a_d_, a_d2g_);
     integrator.forwardIntegrate(sampling_interval_);
     integrator.getState(&traj_pos, &traj_vel, &traj_acc);
 

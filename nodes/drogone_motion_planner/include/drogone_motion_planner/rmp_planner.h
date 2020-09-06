@@ -12,8 +12,10 @@
 #include <drogone_action_rmp/FSMAction.h>
 #include <drogone_motion_planner/cart_cam_geom.h>
 #include <drogone_motion_planner/distance_geom.h>
-#include <drogone_motion_planner/simple_camera_target_policy.h>
-#include <drogone_motion_planner/simple_distance_target_policy.h>
+#include <drogone_motion_planner/distance2ground_geom.h>
+#include <drogone_motion_planner/camera_target_policy.h>
+#include <drogone_motion_planner/distance_target_policy.h>
+#include <drogone_motion_planner/distance2ground_target_policy.h>
 #include <drogone_motion_planner/trapezoidal_integrator.h>
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
@@ -98,13 +100,17 @@ class RMPPlanner{
     // parameters that are changed depending on which state the uav is in
     double u_target_;
     double v_target_;
-    double d_target_;
     double uv_alpha_;
     double uv_beta_;
     double uv_c_;
+    double d_target_;
     double d_alpha_;
     double d_beta_;
     double d_c_;
+    double d2g_target_;
+    double d2g_alpha_;
+    double d2g_beta_;
+    double d2g_c_;
 
     // camera constraints
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
@@ -115,6 +121,7 @@ class RMPPlanner{
 
     // metrics
     double a_d_;
+    double a_d2g_;
     double a_u_;
     double a_v_;
 

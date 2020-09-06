@@ -17,8 +17,8 @@
  * along with RMPCPP. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef RMPCPP_POLICIES_SIMPLE_DISTANCE_TARGET_POLICY_H_
-#define RMPCPP_POLICIES_SIMPLE_DISTANCE_TARGET_POLICY_H_
+#ifndef RMPCPP_POLICIES_DISTANCE_TARGET_POLICY_H_
+#define RMPCPP_POLICIES_DISTANCE_TARGET_POLICY_H_
 #include <rmpcpp/core/policy_base.h>
 #include <ros/ros.h>
 namespace rmpcpp {
@@ -28,7 +28,7 @@ namespace rmpcpp {
  * \tparam n Dimensionality of geometry
  */
 template <int n>
-class SimpleDistanceTargetPolicy : public PolicyBase<n> {
+class DistanceTargetPolicy : public PolicyBase<n> {
   using Vector = typename PolicyBase<n>::Vector;
   using Matrix = typename PolicyBase<n>::Matrix;
 
@@ -39,15 +39,15 @@ class SimpleDistanceTargetPolicy : public PolicyBase<n> {
    * A is the metric to be used.
    * alpha, beta and c are tuning parameters.
    */
-  SimpleDistanceTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
+  DistanceTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
       : target_(target), alpha_(alpha), beta_(beta), c_(c) {
     this->A_ = A;
   }
 
-  SimpleDistanceTargetPolicy(Vector target, double alpha, double beta, double c)
+  DistanceTargetPolicy(Vector target, double alpha, double beta, double c)
       : target_(target), alpha_(alpha), beta_(beta), c_(c) {}
 
-  SimpleDistanceTargetPolicy(Vector target) : target_(target) {}
+  DistanceTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = alpha_ * s(this->space_->minus(target_, x)) - beta_ * x_dot;
@@ -75,4 +75,4 @@ class SimpleDistanceTargetPolicy : public PolicyBase<n> {
 
 }  // namespace rmpcpp
 
-#endif  // RMPCPP_POLICIES_SIMPLE_TARGET_POLICY_H_
+#endif  // RMPCPP_POLICIES_TARGET_POLICY_H_
