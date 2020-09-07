@@ -17,8 +17,8 @@
  * along with RMPCPP. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef RMPCPP_POLICIES_DISTANCE2GROUND_TARGET_POLICY_H_
-#define RMPCPP_POLICIES_DISTANCE2GROUND_TARGET_POLICY_H_
+#ifndef RMPCPP_POLICIES_DISTANCE2GROUND_POLICY_H_
+#define RMPCPP_POLICIES_DISTANCE2GROUND_POLICY_H_
 #include <rmpcpp/core/policy_base.h>
 #include <ros/ros.h>
 namespace rmpcpp {
@@ -28,7 +28,7 @@ namespace rmpcpp {
  * \tparam n Dimensionality of geometry
  */
 template <int n>
-class Distance2GroundTargetPolicy : public PolicyBase<n> {
+class Distance2GroundPolicy : public PolicyBase<n> {
   using Vector = typename PolicyBase<n>::Vector;
   using Matrix = typename PolicyBase<n>::Matrix;
 
@@ -39,40 +39,37 @@ class Distance2GroundTargetPolicy : public PolicyBase<n> {
    * A is the metric to be used.
    * alpha, beta and c are tuning parameters.
    */
-  Distance2GroundTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {
+  Distance2GroundPolicy(Matrix A, double alpha, double beta)
+      : alpha_(alpha), beta_(beta) {
     this->A_ = A;
   }
 
-  Distance2GroundTargetPolicy(Vector target, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {}
+  Distance2GroundPolicy(double alpha, double beta)
+      : alpha_(alpha), beta_(beta) {}
 
-  Distance2GroundTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = alpha_ * s(this->space_->minus(target_, x)) - beta_ * x_dot;
+    this->f_ = (alpha_ / x[0] - beta_ * x_dot[0]) * x / x[0];
+    if(this->f_[0] > a_max_){
+      this->f_[0] = a_max_;
+      // std::cout << "ACC set to maximum by DISTANCE2GROUND policy" << std::endl;
+    }
   }
 
   Vector getAccField(){
     return this->f_;
   }
 
+  void setMaxAcc(double a){
+    a_max_ = a;
+  }
+
  protected:
-  /**
-   *  Normalization helper function.
-   */
-  inline Vector s(Vector x) { return x / h(this->space_->norm(x)); }
 
-  /**
-   * Softmax helper function
-   */
-  inline double h(const double z) { return (z + sigma_ * c_ * log(1 + exp(-2 * c_ * z / sigma_))); }
-
-  Vector target_;
-  double alpha_{1.0}, beta_{8.0}, c_{0.005};
-  double sigma_{1.0};
+  double alpha_{1.0}, beta_{8.0};
+  double a_max_;
 };
 
 }  // namespace rmpcpp
 
-#endif  // RMPCPP_POLICIES_TARGET_POLICY_H_
+#endif  // RMPCPP_POLICIES_POLICY_H_

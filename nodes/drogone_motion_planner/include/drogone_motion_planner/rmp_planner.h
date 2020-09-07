@@ -15,7 +15,7 @@
 #include <drogone_motion_planner/distance2ground_geom.h>
 #include <drogone_motion_planner/camera_target_policy.h>
 #include <drogone_motion_planner/distance_target_policy.h>
-#include <drogone_motion_planner/distance2ground_target_policy.h>
+#include <drogone_motion_planner/distance2ground_policy.h>
 #include <drogone_motion_planner/trapezoidal_integrator.h>
 #include <rmpcpp/core/policy_container.h>
 #include <rmpcpp/policies/simple_target_policy.h>
@@ -52,8 +52,8 @@ class RMPPlanner{
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
-    bool Follow();
-    void follow_callback(const drogone_msgs_rmp::target_detection& victim_pos);
+    bool SubDetection();
+    void detection_callback(const drogone_msgs_rmp::target_detection& victim_pos);
     void planTrajectory();
     bool Land();
 
@@ -125,7 +125,7 @@ class RMPPlanner{
     double a_u_;
     double a_v_;
 
-    uint follow_counter_;
+    bool first_detection_;
 
     double accuracy_ = 0.3;
     double a_max_W_;

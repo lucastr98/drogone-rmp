@@ -190,10 +190,9 @@ bool RMPPlanner::TakeOff(){
   }
 }
 
-bool RMPPlanner::Follow(){
-  ROS_WARN_STREAM("MP ----- FOLLOW");
-  follow_counter_ = 0;
-  sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::follow_callback, this);
+bool RMPPlanner::SubDetection(){
+  first_detection_ = true;
+  sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::detection_callback, this);
 
   // lock the mutex and wait until it is unlocked (in catch_traj, once last traj is calculated)
   std::unique_lock<std::mutex> uLock(mutex_);
@@ -201,11 +200,11 @@ bool RMPPlanner::Follow(){
   return true;
 }
 
-void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victim_pos){
+void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& victim_pos){
   // store the correct uav state in planning_uav_state_
-  follow_counter_ += 1;
-  if(follow_counter_ == 1){
+  if(first_detection_){
     planning_uav_state_ = physical_uav_state_;
+    first_detection_ = false;
   }
   else{
     planning_uav_state_ = trajectory_uav_state_;
@@ -244,11 +243,16 @@ void RMPPlanner::follow_callback(const drogone_msgs_rmp::target_detection& victi
   d_beta_ = 0.2 * d_alpha_;
   d_c_ = 0.5;
   // a_d_ = a_d_;
-  d2g_target_ = 2.0;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
-  d2g_c_ = 0.5;
   // a_d2g_ = a_d2g_;
+
+  if(planning_uav_state_.position[2] < 2){
+    a_d2g_ = 100;
+  }
+  else{
+    a_d2g_ = 0;
+  }
 
   this->planTrajectory();
 }
@@ -286,9 +290,7 @@ void RMPPlanner::planTrajectory(){
 
   // create target policy in distance2ground task space
   const int task_space_distance2ground_dimension = distance2ground_geometry::K;
-  Eigen::Matrix<double, task_space_distance2ground_dimension, 1> distance2ground_target;
-  distance2ground_target[0] = d2g_target_;
-  rmpcpp::Distance2GroundTargetPolicy<task_space_distance2ground_dimension> distance2ground_policy(distance2ground_target, d2g_alpha_, d2g_beta_, d2g_c_);
+  rmpcpp::Distance2GroundPolicy<task_space_distance2ground_dimension> distance2ground_policy(d2g_alpha_, d2g_beta_);
 
   // create metrics for the target policies
   camera_geometry::MatrixX A_camera(camera_geometry::MatrixX::Zero());
@@ -411,6 +413,10 @@ void RMPPlanner::planTrajectory(){
       cur_vel[2] = traj_vel[2];
     }
 
+    // calculate distance 2 ground
+    d2g[0] = cur_pose.translation()[2] - 0;
+    d2g_dot[0] = cur_vel[2];
+
     // get u, v, d and normalization constant for velocity from transformer which was updated above with the pose currently looked at
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
              transformer_.PosWorld2Image(target_pos);
@@ -441,6 +447,10 @@ void RMPPlanner::planTrajectory(){
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
 
+    // set maximum acceleration in distance2ground policy
+    distance2ground_policy.setMaxAcc(a_max_W_);
+
+    // calculate acceleration
     integrator.setX(u_v, u_v_dot, d, d_dot, d2g, d2g_dot);
     integrator.setPercentages(a_u_, a_v_, a_d_, a_d2g_);
     integrator.forwardIntegrate(sampling_interval_);
@@ -586,7 +596,7 @@ void RMPPlanner::server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal
       as_.setPreempted();
     }
 
-    if(this->Follow()){
+    if(this->SubDetection()){
       ROS_INFO("%s: Succeeded", action_name_.c_str());
       as_.setSucceeded();
     }
