@@ -97,6 +97,9 @@ class RMPPlanner{
     double old_stamp_;
     ros::Time time_of_last_detection_;
 
+    Eigen::Vector3d cur_target_pos_;
+    Eigen::Vector3d last_target_pos_;
+
     // parameters that are changed depending on which state the uav is in
     double u_target_;
     double v_target_;

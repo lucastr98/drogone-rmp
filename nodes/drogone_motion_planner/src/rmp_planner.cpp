@@ -204,7 +204,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
     planning_uav_state_ = physical_uav_state_;
-    first_detection_ = false;
   }
   else{
     planning_uav_state_ = trajectory_uav_state_;
@@ -216,13 +215,19 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // store time of detection
   time_of_last_detection_ = victim_pos.header.stamp;
 
-  // store the information of detection
-  detection_.u = victim_pos.u;
-  detection_.v = victim_pos.v;
-  detection_.d = victim_pos.d;
+  // create transformer to make transformations between image and world and use real odometry!
+  Eigen::Affine3d uav_pose;
+  uav_pose.translation() = physical_uav_state_.position;
+  uav_pose.linear() = physical_uav_state_.orientation.toRotationMatrix();
+  transformer_.setMatrices(uav_pose);
+
+  // calculate target position in world frame and store it in member variable
+  Eigen::Matrix<double, 3, 1> detection;
+  detection << victim_pos.u, victim_pos.v, victim_pos.d;
+  cur_target_pos_ = transformer_.PosImage2World(detection);
 
   // stop planning if goal is reached
-  if(detection_.d < 0.5){
+  if(victim_pos.d < 0.5){
     // take ownership of the mutex (unlock mutex from the lock in Follow())
     std::lock_guard<std::mutex> guard(mutex_);
     // notify the condition variable to stop waiting (in Follow())
@@ -233,10 +238,31 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     return;
   }
 
-  // set the parameters
+  // calculate approx velocity from current and last position
+  Eigen::Vector3d cur_target_vel;
+  if(first_detection_){
+    cur_target_vel << 0.0, 0.0, 0.0;
+  }
+  else{
+    cur_target_vel = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
+  }
+
+  /* SET THE POLICY VARIABLES */
+  // assuming beta = 3 is optimal for a target vel of 2 or smaller
+  // and beta = 1 is optimal for a target vel of 5 or bigger
+  // and in between the dependency is linear.
+  // calculate beta as a linear interpolation of this
+  if(cur_target_vel.norm() <= 2){
+    uv_beta_ = 3.0;
+  }
+  else if(cur_target_vel.norm() >= 5){
+    uv_beta_ = 1.0;
+  }
+  else{
+    uv_beta_ = 3 + (cur_target_vel.norm() - 2) * (1 - 3) / (5 - 2);
+  }
   u_target_ = 0.0;
   v_target_ = 0.0;
-  uv_beta_ = 3.0;
   uv_c_ = 0.05;
   d_target_ = 2.0;
   d_beta_ = 1.6;
@@ -244,6 +270,8 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
 
+  /* SET THE WEIGHTS DEPENDING ON THE STATE */
+  // TODO:
   if(planning_uav_state_.position[2] < 2){
     a_d2g_ = 100;
   }
@@ -251,8 +279,15 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_d2g_ = 0;
   }
 
-
   this->planTrajectory();
+
+  // store current target position in the last target position variable for the next iteration
+  last_target_pos_ = cur_target_pos_;
+
+  // during the first detection, store that it's not the first detection anymore
+  if(first_detection_){
+    first_detection_ = false;
+  }
 }
 
 void RMPPlanner::planTrajectory(){
@@ -336,20 +371,9 @@ void RMPPlanner::planTrajectory(){
   elems[3] = pinhole_constants_.v_0;
   task_space_camera_geometry.SetK(elems);
 
-  // create transformer to make transformations between image and world and use real odometry!
-  Eigen::Affine3d uav_pose;
-  uav_pose.translation() = physical_uav_state_.position;
-  uav_pose.linear() = physical_uav_state_.orientation.toRotationMatrix();
-  transformer_.setMatrices(uav_pose);
-
-  // calculate target position in world frame
-  Eigen::Matrix<double, 3, 1> detection;
-  detection << detection_.u, detection_.v, detection_.d;
-  Eigen::Vector3d target_pos = transformer_.PosImage2World(detection);
-
   // set target position in world frame for jacobian calculation of both geometries
-  task_space_camera_geometry.SetTargetPos(target_pos);
-  task_space_distance_geometry.SetTargetPos(target_pos);
+  task_space_camera_geometry.SetTargetPos(cur_target_pos_);
+  task_space_distance_geometry.SetTargetPos(cur_target_pos_);
 
   // set current position in Q for jacobian calculation of both geometries
   task_space_camera_geometry.setQ(pos);
@@ -417,7 +441,7 @@ void RMPPlanner::planTrajectory(){
 
     // get u, v, d and normalization constant for velocity from transformer which was updated above with the pose currently looked at
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
-             transformer_.PosWorld2Image(target_pos);
+             transformer_.PosWorld2Image(cur_target_pos_);
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
     d[0] = image_pair.first[2];
@@ -425,7 +449,7 @@ void RMPPlanner::planTrajectory(){
 
     // get the velocities
     Eigen::Matrix<double, 3, 1> image_vel =
-             transformer_.VelWorld2Image(target_pos, cur_vel, vel_normalization);
+             transformer_.VelWorld2Image(cur_target_pos_, cur_vel, vel_normalization);
     u_v_dot[0] = image_vel[0];
     u_v_dot[1] = image_vel[1];
     d_dot[0] = image_vel[2];
@@ -434,13 +458,13 @@ void RMPPlanner::planTrajectory(){
     Eigen::Vector3d cur_max_acc;
     cur_max_acc << a_max_W_, 0.0, 0.0;
     Eigen::Matrix<double, 3, 1> image_max_acc =
-             transformer_.VelWorld2Image(target_pos, cur_max_acc, vel_normalization);
+             transformer_.VelWorld2Image(cur_target_pos_, cur_max_acc, vel_normalization);
     double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
     camera_policy.setMaxAcc(a_max_C);
 
     // adjust A metric to correct range
-    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (cur_pose.translation()[2] - target_pos[2]) / (cur_pose.translation()[2] - target_pos[2]);
-    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (cur_pose.translation()[2] - target_pos[2]) / (cur_pose.translation()[2] - target_pos[2]);
+    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
+    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
     A_camera(0, 0) = a_u_ / divider_u;
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
@@ -464,7 +488,7 @@ void RMPPlanner::planTrajectory(){
     // if the target is passed change the distance policy
     Eigen::Vector3d uav_pos;
     uav_pos << traj_pos[0], traj_pos[1], traj_pos[2];
-    if((target_pos - uav_pos).norm() < 0.1 && !target_passed_){
+    if((cur_target_pos_ - uav_pos).norm() < 0.1 && !target_passed_){
       target_passed_ = true;
     }
 
