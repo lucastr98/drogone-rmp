@@ -210,6 +210,9 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     planning_uav_state_ = trajectory_uav_state_;
   }
 
+  // set target_passed_ false again if the target is passed the replanning stops anyway
+  target_passed_ = false;
+
   // store time of detection
   time_of_last_detection_ = victim_pos.header.stamp;
 
@@ -233,19 +236,13 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // set the parameters
   u_target_ = 0.0;
   v_target_ = 0.0;
-  uv_alpha_ = 1.0;
   uv_beta_ = 3.0;
   uv_c_ = 0.05;
-  // a_u_ = a_u_;
-  // a_v_ = a_v_;
   d_target_ = 2.0;
-  d_alpha_ = 3;
-  d_beta_ = 0.2 * d_alpha_;
+  d_beta_ = 1.6;
   d_c_ = 0.5;
-  // a_d_ = a_d_;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
-  // a_d2g_ = a_d2g_;
 
   if(planning_uav_state_.position[2] < 2){
     a_d2g_ = 100;
@@ -253,6 +250,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   else{
     a_d2g_ = 0;
   }
+
 
   this->planTrajectory();
 }
@@ -280,13 +278,13 @@ void RMPPlanner::planTrajectory(){
   Eigen::Matrix<double, task_space_camera_dimension, 1> camera_target;
   camera_target[0] = u_target_;
   camera_target[1] = v_target_;
-  rmpcpp::CameraTargetPolicy<task_space_camera_dimension> camera_policy(camera_target, uv_alpha_, uv_beta_, uv_c_);
+  rmpcpp::CameraTargetPolicy<task_space_camera_dimension> camera_policy(camera_target, uv_beta_, uv_c_);
 
   // create target policy in distance task space
   const int task_space_distance_dimension = distance_geometry::K;
   Eigen::Matrix<double, task_space_distance_dimension, 1> distance_target;
   distance_target[0] = d_target_;
-  rmpcpp::DistanceTargetPolicy<task_space_distance_dimension> distance_policy(distance_target, d_alpha_, d_beta_, d_c_);
+  rmpcpp::DistanceTargetPolicy<task_space_distance_dimension> distance_policy(distance_target, d_beta_, d_c_);
 
   // create target policy in distance2ground task space
   const int task_space_distance2ground_dimension = distance2ground_geometry::K;
@@ -438,7 +436,7 @@ void RMPPlanner::planTrajectory(){
     Eigen::Matrix<double, 3, 1> image_max_acc =
              transformer_.VelWorld2Image(target_pos, cur_max_acc, vel_normalization);
     double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
-    camera_policy.updateMaxAcc(a_max_C);
+    camera_policy.setMaxAcc(a_max_C);
 
     // adjust A metric to correct range
     double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (cur_pose.translation()[2] - target_pos[2]) / (cur_pose.translation()[2] - target_pos[2]);
@@ -447,8 +445,12 @@ void RMPPlanner::planTrajectory(){
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
 
-    // set maximum acceleration in distance2ground policy
+    // set maximum acceleration in distance and distance2ground policy
+    distance_policy.setMaxAcc(a_max_W_);
     distance2ground_policy.setMaxAcc(a_max_W_);
+
+    // set whether or not the target is passed
+    distance_policy.setTargetPassed(target_passed_);
 
     // calculate acceleration
     integrator.setX(u_v, u_v_dot, d, d_dot, d2g, d2g_dot);
@@ -458,6 +460,13 @@ void RMPPlanner::planTrajectory(){
 
     // create trajectory point from current state and append it to the trajectory msg
     this->create_traj_point(t, traj_pos, traj_vel, traj_acc, &trajectory_msg);
+
+    // if the target is passed change the distance policy
+    Eigen::Vector3d uav_pos;
+    uav_pos << traj_pos[0], traj_pos[1], traj_pos[2];
+    if((target_pos - uav_pos).norm() < 0.1 && !target_passed_){
+      target_passed_ = true;
+    }
 
     // publish acc field and state for analyzation purposes
     double t_for_msg = time_of_last_detection_.toSec() + t;

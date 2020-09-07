@@ -127,6 +127,8 @@ class RMPPlanner{
 
     bool first_detection_;
 
+    bool target_passed_;
+
     double accuracy_ = 0.3;
     double a_max_W_;
     double frequency_;

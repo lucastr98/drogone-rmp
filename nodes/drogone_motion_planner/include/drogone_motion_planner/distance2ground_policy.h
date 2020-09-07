@@ -50,24 +50,23 @@ class Distance2GroundPolicy : public PolicyBase<n> {
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     this->f_ = (alpha_ / x[0] - beta_ * x_dot[0]) * x / x[0];
-    if(this->f_[0] > a_max_){
-      this->f_[0] = a_max_;
-      // std::cout << "ACC set to maximum by DISTANCE2GROUND policy" << std::endl;
+    if(this->f_[0] > max_acc_){
+      this->f_[0] = max_acc_;
     }
+  }
+
+  void setMaxAcc(double max_acc){
+    max_acc_ = max_acc;
   }
 
   Vector getAccField(){
     return this->f_;
   }
 
-  void setMaxAcc(double a){
-    a_max_ = a;
-  }
-
  protected:
 
   double alpha_{1.0}, beta_{8.0};
-  double a_max_;
+  double max_acc_;
 };
 
 }  // namespace rmpcpp

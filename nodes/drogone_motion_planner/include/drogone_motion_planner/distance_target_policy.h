@@ -39,22 +39,35 @@ class DistanceTargetPolicy : public PolicyBase<n> {
    * A is the metric to be used.
    * alpha, beta and c are tuning parameters.
    */
-  DistanceTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {
+  DistanceTargetPolicy(Vector target, Matrix A, double beta, double c)
+      : target_(target), beta_(beta), c_(c) {
     this->A_ = A;
   }
 
-  DistanceTargetPolicy(Vector target, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {}
+  DistanceTargetPolicy(Vector target, double beta, double c)
+      : target_(target), beta_(beta), c_(c) {}
 
   DistanceTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = alpha_ * s(this->space_->minus(target_, x)) - beta_ * x_dot;
+    if(!target_passed_){
+      this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    }
+    else{
+      this->f_ = s(this->space_->minus(target_, x)) * max_acc_ + beta_ * x_dot;
+    }
+  }
+
+  void setMaxAcc(double max_acc){
+    max_acc_ = max_acc;
   }
 
   Vector getAccField(){
     return this->f_;
+  }
+
+  void setTargetPassed(bool target_passed){
+    target_passed_ = target_passed;
   }
 
  protected:
@@ -69,8 +82,10 @@ class DistanceTargetPolicy : public PolicyBase<n> {
   inline double h(const double z) { return (z + sigma_ * c_ * log(1 + exp(-2 * c_ * z / sigma_))); }
 
   Vector target_;
-  double alpha_{1.0}, beta_{8.0}, c_{0.005};
+  double beta_{8.0}, c_{0.005};
   double sigma_{1.0};
+  double max_acc_;
+  bool target_passed_;
 };
 
 }  // namespace rmpcpp

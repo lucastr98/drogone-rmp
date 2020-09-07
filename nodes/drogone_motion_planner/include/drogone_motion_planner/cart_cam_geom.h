@@ -54,6 +54,10 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     mtx_j(0, 3) = 0;
     mtx_j(1, 3) = 0;
 
+    // // deactivate z influence
+    // mtx_j(0, 2) = 0;
+    // mtx_j(1, 2) = 0;
+
     return mtx_j;
   }
 

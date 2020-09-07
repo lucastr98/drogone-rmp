@@ -40,18 +40,18 @@ class CameraTargetPolicy : public PolicyBase<n> {
    * A is the metric to be used.
    * alpha, beta and c are tuning parameters.
    */
-  CameraTargetPolicy(Vector target, Matrix A, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {
+  CameraTargetPolicy(Vector target, Matrix A, double beta, double c)
+      : target_(target), beta_(beta), c_(c) {
     this->A_ = A;
   }
 
-  CameraTargetPolicy(Vector target, double alpha, double beta, double c)
-      : target_(target), alpha_(alpha), beta_(beta), c_(c) {}
+  CameraTargetPolicy(Vector target, double beta, double c)
+      : target_(target), beta_(beta), c_(c) {}
 
   CameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = /*alpha_ **/ s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
   }
 
   std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
@@ -70,7 +70,7 @@ class CameraTargetPolicy : public PolicyBase<n> {
     return the_returner;
   }
 
-  void updateMaxAcc(double max_acc){
+  void setMaxAcc(double max_acc){
     max_acc_ = max_acc;
   }
 
@@ -90,7 +90,7 @@ class CameraTargetPolicy : public PolicyBase<n> {
   inline double h(const double z) { return (z + sigma_ * c_ * log(1 + exp(-2 * c_ * z / sigma_))); }
 
   Vector target_;
-  double alpha_{1.0}, beta_{8.0}, c_{0.005};
+  double beta_{8.0}, c_{0.005};
   double sigma_{sqrt((1024 / 2) * (1024 / 2) + (768 / 2) * (768 / 2))};
   double max_acc_ = 200;
 };
