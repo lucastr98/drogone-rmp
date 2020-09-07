@@ -41,6 +41,12 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     if(!nh_private_.getParam("v_0", pinhole_constants_.v_0)){
       ROS_ERROR("failed to load v_0");
     }
+    if(!nh_private_.getParam("w", image_width_px_)){
+      ROS_ERROR("failed to load w");
+    }
+    if(!nh_private_.getParam("h", image_height_px_)){
+      ROS_ERROR("failed to load h");
+    }
 
     if(!nh_private_.getParam("roll", camera_mounting_.roll)){
       ROS_ERROR("failed to load roll");
@@ -270,15 +276,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
 
-  /* SET THE WEIGHTS DEPENDING ON THE STATE */
-  // TODO:
-  if(planning_uav_state_.position[2] < 2){
-    a_d2g_ = 100;
-  }
-  else{
-    a_d2g_ = 0;
-  }
-
   this->planTrajectory();
 
   // store current target position in the last target position variable for the next iteration
@@ -329,14 +326,6 @@ void RMPPlanner::planTrajectory(){
   camera_geometry::MatrixX A_camera(camera_geometry::MatrixX::Zero());
   distance_geometry::MatrixX A_distance(distance_geometry::MatrixX::Zero());
   distance2ground_geometry::MatrixX A_distance2ground(distance2ground_geometry::MatrixX::Zero());
-
-  // fill the metric for the distance policy, as it stays the same
-  A_distance(0, 0) = a_d_;
-  distance_policy.setA(A_distance);
-
-  // fill the metric for the distance policy, as it stays the same
-  A_distance2ground(0, 0) = a_d2g_;
-  distance2ground_policy.setA(A_distance2ground);
 
   // add the policies into the container
   camera_container.addPolicy(&camera_policy);
@@ -462,12 +451,23 @@ void RMPPlanner::planTrajectory(){
     double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
     camera_policy.setMaxAcc(a_max_C);
 
-    // adjust A metric to correct range
+    // update the weights
+    this->updateWeights(u_v[0], u_v[1], d[0]);
+
+    // fill the metric for the camera policy
     double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
     double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
     A_camera(0, 0) = a_u_ / divider_u;
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
+
+    // fill the metric for the distance policy
+    A_distance(0, 0) = a_d_;
+    distance_policy.setA(A_distance);
+
+    // fill the metric for the distance2ground policy
+    A_distance2ground(0, 0) = a_d2g_;
+    distance2ground_policy.setA(A_distance2ground);
 
     // set maximum acceleration in distance and distance2ground policy
     distance_policy.setMaxAcc(a_max_W_);
@@ -508,6 +508,72 @@ void RMPPlanner::planTrajectory(){
   // std::cout << "Duration: " << duration << " microseconds" << std::endl;
 }
 
+void RMPPlanner::updateWeights(double u, double v, double d){
+  // default values
+  a_u_ = 1.0;
+  a_v_ = 1.0;
+  a_d_ = 2.0;
+  a_d2g_ = 0.0;
+
+  // variables necessary to evaluate state
+  u = abs(u);
+  v = abs(v);
+  d = abs(d);
+  std::vector<double> u_grid;
+  std::vector<double> v_grid;
+  for(double i = 0; i <= 5; i++){
+    u_grid.push_back(i / 5 * image_width_px_);
+    v_grid.push_back(i / 5 * image_height_px_);
+  }
+
+  int u_seq = 0;
+  int v_seq = 0;
+  for(int j = 0; j < 5; j++){
+    if(u >= u_grid[j] && u <= u_grid[j + 1]){
+      u_seq = j + 1;
+    }
+    if(v >= v_grid[j] && v <= v_grid[j + 1]){
+      v_seq = j + 1;
+    }
+    if(j == 4 && (u_seq == 0 || v_seq == 0)){
+      ROS_WARN_STREAM("MP ----- FOR LOOP FOR DETERMINING WEIGHTS FAILED");
+    }
+  }
+
+  if(u_seq == 4){
+    // a_u_ = 5;
+    a_u_ = 2;
+  }
+  else if(u_seq == 5){
+    // a_u_ = 10;
+    a_u_ = 5;
+  }
+
+  if(v_seq == 4){
+    // a_v_ = 5;
+    a_v_ = 2;
+  }
+  else if(v_seq == 5){
+    // a_v_ = 10;
+    a_v_ = 5;
+  }
+
+  if(v_seq == 1 && u_seq == 1){
+    a_d_ = 10;
+  }
+  else if((v_seq == 2 && u_seq == 2) || (v_seq == 1 && u_seq == 2) || (v_seq == 2 && u_seq == 1)){
+    a_d_ = 5;
+  }
+
+  if(planning_uav_state_.position[2] < 2){
+    a_d2g_ = 100;
+  }
+  else{
+    a_d2g_ = 0;
+  }
+
+  // std::cout << "a_u_: " << a_u_ << ", a_v_: " << a_v_ << ", a_d_: " << a_d_ << ", a_d2g_: " << a_d2g_ << std::endl;
+}
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
                                    Eigen::Matrix<double, 4, 1> traj_vel,

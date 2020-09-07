@@ -55,6 +55,7 @@ class RMPPlanner{
     bool SubDetection();
     void detection_callback(const drogone_msgs_rmp::target_detection& victim_pos);
     void planTrajectory();
+    void updateWeights(double u, double v, double d);
     bool Land();
 
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
@@ -117,6 +118,8 @@ class RMPPlanner{
 
     // camera constraints
     drogone_transformation_lib::PinholeConstants pinhole_constants_;
+    double image_width_px_;
+    double image_height_px_;
     drogone_transformation_lib::CameraMounting camera_mounting_;
     drogone_transformation_lib::Transformations transformer_;
 
