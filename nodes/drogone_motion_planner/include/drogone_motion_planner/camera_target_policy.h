@@ -51,7 +51,20 @@ class CameraTargetPolicy : public PolicyBase<n> {
   CameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    // this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    double P = 1;
+    double I = 0.2;
+    double D = 2;
+    this->f_ = P * this->space_->minus(target_, x) - D * x_dot + I * integrator_;
+    std::cout << "P: " << P * this->space_->minus(target_, x)[0] << std::endl;
+    std::cout << "D: " << - D * x_dot[0] << std::endl;
+    std::cout << "I: " << I * integrator_[0] << std::endl;
+    std::cout << " " << std::endl;
+    integrator_ += this->space_->minus(target_, x) * sampling_interval_;
+    if(counter_ == int((1 / frequency_) / sampling_interval_ - 1)){
+      cur_integrator_ = integrator_;
+    }
+    counter_ += 1;
   }
 
   std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
@@ -74,6 +87,17 @@ class CameraTargetPolicy : public PolicyBase<n> {
     max_acc_ = max_acc;
   }
 
+  void setIntegrator(Vector integrator, double sampling_interval, double frequency){
+    integrator_ = integrator;
+    sampling_interval_ = sampling_interval;
+    frequency_ = frequency;
+    counter_ = 0;
+  }
+
+  Vector getIntegrator(){
+    return cur_integrator_;
+  }
+
   Vector getAccField(){
     return this->f_;
   }
@@ -93,6 +117,11 @@ class CameraTargetPolicy : public PolicyBase<n> {
   double beta_{8.0}, c_{0.005};
   double sigma_{sqrt((1024 / 2) * (1024 / 2) + (768 / 2) * (768 / 2))};
   double max_acc_ = 200;
+  Vector integrator_;
+  Vector cur_integrator_{Vector::Zero()};
+  double sampling_interval_;
+  double frequency_;
+  int counter_;
 };
 
 }  // namespace rmpcpp

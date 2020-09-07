@@ -119,6 +119,8 @@ class RMPPlanner{
 
     DetectorInfo detection_;
 
+    Eigen::Matrix<double, 2, 1> camera_integrator_;
+
     // metrics
     double a_d_;
     double a_d2g_;

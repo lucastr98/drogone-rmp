@@ -203,6 +203,8 @@ bool RMPPlanner::SubDetection(){
 void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& victim_pos){
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
+    camera_integrator_[0] = 0.0;
+    camera_integrator_[1] = 0.0;
     planning_uav_state_ = physical_uav_state_;
     first_detection_ = false;
   }
@@ -289,6 +291,9 @@ void RMPPlanner::planTrajectory(){
   // create target policy in distance2ground task space
   const int task_space_distance2ground_dimension = distance2ground_geometry::K;
   rmpcpp::Distance2GroundPolicy<task_space_distance2ground_dimension> distance2ground_policy(d2g_alpha_, d2g_beta_);
+
+  // set the integrator of the camera policy
+  camera_policy.setIntegrator(camera_integrator_, sampling_interval_, frequency_);
 
   // create metrics for the target policies
   camera_geometry::MatrixX A_camera(camera_geometry::MatrixX::Zero());
@@ -478,6 +483,8 @@ void RMPPlanner::planTrajectory(){
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
+
+  camera_integrator_ = camera_policy.getIntegrator();
 
   chrono_t2_ = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
