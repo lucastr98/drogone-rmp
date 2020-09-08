@@ -64,19 +64,6 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     }
     camera_mounting_.translation << cam_trans[0], cam_trans[1], cam_trans[2];
 
-    if(!nh_private_.getParam("a_d", a_d_)){
-      ROS_ERROR("failed to load a_d");
-    }
-    if(!nh_private_.getParam("a_d2g", a_d2g_)){
-      ROS_ERROR("failed to load a_d2g");
-    }
-    if(!nh_private_.getParam("a_u", a_u_)){
-      ROS_ERROR("failed to load a_u");
-    }
-    if(!nh_private_.getParam("a_v", a_v_)){
-      ROS_ERROR("failed to load a_v");
-    }
-
     if(!nh_private_.getParam("frequency", frequency_)){
       ROS_ERROR("failed to load frequency");
     }
@@ -106,12 +93,12 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
   Eigen::Affine3d current_pose;
   tf::poseMsgToEigen(odom->pose.pose, current_pose);
 
-  physical_uav_state_.position = current_pose.translation();
-  physical_uav_state_.orientation = current_pose.linear();
-  physical_uav_state_.yaw = std::atan2(2.0 * (physical_uav_state_.orientation.w() * physical_uav_state_.orientation.z() +
-                                       physical_uav_state_.orientation.x() * physical_uav_state_.orientation.y()),
-                                       1.0 - 2.0 * (physical_uav_state_.orientation.y() * physical_uav_state_.orientation.y() +
-                                       physical_uav_state_.orientation.z() * physical_uav_state_.orientation.z()));
+  physical_uav_state_.pose = current_pose;
+  Eigen::Quaterniond cur_ori(physical_uav_state_.pose.linear());
+  physical_uav_state_.yaw = std::atan2(2.0 * (cur_ori.w() * cur_ori.z() +
+                                       cur_ori.x() * cur_ori.y()),
+                                       1.0 - 2.0 * (cur_ori.y() * cur_ori.y() +
+                                       cur_ori.z() * cur_ori.z()));
 
   // store current_velocity_ from before, before changing it
   Eigen::Vector3d v0, v1;
@@ -121,7 +108,7 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
 
   // store current velocity (after transforming it from msg to an Eigen vector)
   tf::vectorMsgToEigen(odom->twist.twist.linear, physical_uav_state_.velocity);
-  physical_uav_state_.velocity = physical_uav_state_.orientation.toRotationMatrix() * physical_uav_state_.velocity;
+  physical_uav_state_.velocity = physical_uav_state_.pose.linear() * physical_uav_state_.velocity;
   physical_uav_state_.yaw_vel = odom->twist.twist.angular.z;
 
   double t = duration;
@@ -146,14 +133,16 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
 
 void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory::ConstPtr& traj){
   int point_num = 1 / frequency_ / sampling_interval_ - 1;
-  tf::vectorMsgToEigen(traj->points[point_num].transforms[0].translation, trajectory_uav_state_.position);
+  Eigen::Vector3d position;
+  tf::vectorMsgToEigen(traj->points[point_num].transforms[0].translation, position);
+  trajectory_uav_state_.pose.translation() = position;
   tf::vectorMsgToEigen(traj->points[point_num].velocities[0].linear, trajectory_uav_state_.velocity);
   tf::vectorMsgToEigen(traj->points[point_num].accelerations[0].linear, trajectory_uav_state_.acceleration);
-  // tf::quaternionMsgToEigen(traj->points[point_num].transforms[0].rotation, trajectory_uav_state_.orientation);
-  trajectory_uav_state_.yaw = std::atan2(2.0 * (trajectory_uav_state_.orientation.w() * trajectory_uav_state_.orientation.z() +
-                                         trajectory_uav_state_.orientation.x() * trajectory_uav_state_.orientation.y()),
-                                         1.0 - 2.0 * (trajectory_uav_state_.orientation.y() * trajectory_uav_state_.orientation.y() +
-                                         trajectory_uav_state_.orientation.z() * trajectory_uav_state_.orientation.z()));
+  Eigen::Quaterniond cur_ori(trajectory_uav_state_.pose.linear());
+  trajectory_uav_state_.yaw = std::atan2(2.0 * (cur_ori.w() * cur_ori.z() +
+                                         cur_ori.x() * cur_ori.y()),
+                                         1.0 - 2.0 * (cur_ori.y() * cur_ori.y() +
+                                         cur_ori.z() * cur_ori.z()));
   trajectory_uav_state_.yaw_vel = traj->points[point_num].velocities[0].angular.z;
   trajectory_uav_state_.yaw_acc = traj->points[point_num].accelerations[0].angular.z;
 
@@ -167,7 +156,7 @@ void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory:
   Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
   Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
   Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
-  trajectory_uav_state_.orientation = rollAngle * yawAngle * pitchAngle;
+  trajectory_uav_state_.pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
 };
 
 
@@ -215,23 +204,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     planning_uav_state_ = trajectory_uav_state_;
   }
 
-  // set target_passed_ false again if the target is passed the replanning stops anyway
-  target_passed_ = false;
-
-  // store time of detection
-  time_of_last_detection_ = victim_pos.header.stamp;
-
-  // create transformer to make transformations between image and world and use real odometry!
-  Eigen::Affine3d uav_pose;
-  uav_pose.translation() = physical_uav_state_.position;
-  uav_pose.linear() = physical_uav_state_.orientation.toRotationMatrix();
-  transformer_.setMatrices(uav_pose);
-
-  // calculate target position in world frame and store it in member variable
-  Eigen::Matrix<double, 3, 1> detection;
-  detection << victim_pos.u, victim_pos.v, victim_pos.d;
-  cur_target_pos_ = transformer_.PosImage2World(detection);
-
   // stop planning if goal is reached
   if(victim_pos.d < 0.5){
     // take ownership of the mutex (unlock mutex from the lock in Follow())
@@ -244,13 +216,75 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     return;
   }
 
+  // set target_passed_ false again if the target is passed the replanning stops anyway
+  target_passed_ = false;
+
+  // store time of detection
+  time_of_last_detection_ = victim_pos.header.stamp;
+
+  // calculate current target position
+  Eigen::Affine3d uav_pose;
+  uav_pose = physical_uav_state_.pose;
+  transformer_.setMatrices(uav_pose);
+  Eigen::Matrix<double, 3, 1> detection;
+  detection << victim_pos.u, victim_pos.v, victim_pos.d;
+  cur_target_pos_ = transformer_.PosImage2World(detection);
+
   // calculate approx velocity from current and last position
-  Eigen::Vector3d cur_target_vel;
   if(first_detection_){
-    cur_target_vel << 0.0, 0.0, 0.0;
+    cur_target_vel_ << 0.0, 0.0, 0.0;
   }
   else{
-    cur_target_vel = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
+    cur_target_vel_ = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
+  }
+
+  /* SET WEIGHTS */
+  // calculate u, v and d with roll = pitch = 0 assumption
+  Eigen::Quaterniond q(planning_uav_state_.pose.linear());
+  double roll, pitch, yaw;
+  yaw = atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
+              1.0 - 2.0 * (q.y() * q.y() - q.z() * q.z()));
+  roll = 0;
+  pitch = 0;
+  Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
+  Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
+  Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
+  planning_uav_state_.pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();   // update planning_uav_state_ with roll = pitch = 0
+  transformer_.setMatrices(planning_uav_state_.pose);
+  std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
+           transformer_.PosWorld2Image(cur_target_pos_);
+  double u = abs(image_pair.first[0]);
+  double v = abs(image_pair.first[1]);
+  double d = abs(image_pair.first[2]);
+
+  // default values
+  a_u_ = 1.0;
+  a_v_ = 1.0;
+  // a_d_ = 2.0;
+  a_d2g_ = 0.0;
+
+  if(u < 150){
+    a_d_ = 10.0;
+    d_target_ = 0.0;
+  }
+  else{
+    if(a_d_ == 10.0){
+      if(u > 800){
+        a_d_ = 2.0;
+        d_target_ = 2.0;
+      }
+    }
+    else{
+      a_d_ = 2.0;
+      d_target_ = 2.0;
+    }
+  }
+
+  if(planning_uav_state_.pose.translation()[2] < 2){
+    a_d2g_ = 100;
+  }
+  else{
+    a_d2g_ = 0;
   }
 
   /* SET THE POLICY VARIABLES */
@@ -258,24 +292,25 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // and beta = 1 is optimal for a target vel of 5 or bigger
   // and in between the dependency is linear.
   // calculate beta as a linear interpolation of this
-  if(cur_target_vel.norm() <= 2){
+  if(cur_target_vel_.norm() <= 2){
     uv_beta_ = 3.0;
   }
-  else if(cur_target_vel.norm() >= 5){
+  else if(cur_target_vel_.norm() >= 5){
     uv_beta_ = 1.0;
   }
   else{
-    uv_beta_ = 3 + (cur_target_vel.norm() - 2) * (1 - 3) / (5 - 2);
+    uv_beta_ = 3 + (cur_target_vel_.norm() - 2) * (1 - 3) / (5 - 2);
   }
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  d_target_ = 2.0;
+  // d_target_ = 2.0;
   d_beta_ = 1.6;
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
 
+  // plan Trajectory with current weights
   this->planTrajectory();
 
   // store current target position in the last target position variable for the next iteration
@@ -327,6 +362,14 @@ void RMPPlanner::planTrajectory(){
   distance_geometry::MatrixX A_distance(distance_geometry::MatrixX::Zero());
   distance2ground_geometry::MatrixX A_distance2ground(distance2ground_geometry::MatrixX::Zero());
 
+  // fill the metric for the distance policy
+  A_distance(0, 0) = a_d_;
+  distance_policy.setA(A_distance);
+
+  // fill the metric for the distance2ground policy
+  A_distance2ground(0, 0) = a_d2g_;
+  distance2ground_policy.setA(A_distance2ground);
+
   // add the policies into the container
   camera_container.addPolicy(&camera_policy);
   distance_container.addPolicy(&distance_policy);
@@ -338,9 +381,9 @@ void RMPPlanner::planTrajectory(){
   // reset integrator with current pos and vel for x, y, z, yaw
   const int config_space_dimension = camera_geometry::D;
   Eigen::Matrix<double, config_space_dimension, 1> pos, vel, acc;
-  pos[0] = planning_uav_state_.position[0];
-  pos[1] = planning_uav_state_.position[1];
-  pos[2] = planning_uav_state_.position[2];
+  pos[0] = planning_uav_state_.pose.translation()[0];
+  pos[1] = planning_uav_state_.pose.translation()[1];
+  pos[2] = planning_uav_state_.pose.translation()[2];
   pos[3] = planning_uav_state_.yaw;
   vel[0] = planning_uav_state_.velocity[0];
   vel[1] = planning_uav_state_.velocity[1];
@@ -374,32 +417,11 @@ void RMPPlanner::planTrajectory(){
   Eigen::Matrix<double, task_space_camera_dimension, 1> u_v, u_v_dot;
   Eigen::Matrix<double, task_space_distance_dimension, 1> d, d_dot;
   Eigen::Matrix<double, task_space_distance2ground_dimension, 1> d2g, d2g_dot;
-  Eigen::Affine3d cur_pose;
-  Eigen::Vector3d cur_vel = planning_uav_state_.velocity;
 
   // integrate 2s into the future
   for(double t = 0.0; t <= MPC_horizon_ + sampling_interval_; t += sampling_interval_){
     // update transformer with roll/pitch 0 and the current position
-    if(t == 0.0){
-      // get yaw from orientation based on old trajectory and set roll & pitch to zero
-      Eigen::Quaterniond q = planning_uav_state_.orientation;
-      double roll, pitch, yaw;
-      yaw = atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
-                  1.0 - 2.0 * (q.y() * q.y() - q.z() * q.z()));
-      roll = 0;
-      pitch = 0;
-
-      // store orientation and position in cur_pose
-      Eigen::AngleAxisd rollAngle(roll, Eigen::Vector3d::UnitX());
-      Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
-      Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
-      cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
-      cur_pose.translation() = planning_uav_state_.position;
-
-      // set current pose in the transformer
-      transformer_.setMatrices(cur_pose);
-    }
-    else{
+    if(t > 0.0){
       // get yaw from acceleration and set roll/pitch zero
       double roll, pitch, yaw;
       yaw = traj_pos[3];
@@ -411,22 +433,22 @@ void RMPPlanner::planTrajectory(){
       Eigen::AngleAxisd pitchAngle(pitch, Eigen::Vector3d::UnitY());
       Eigen::AngleAxisd yawAngle(yaw, Eigen::Vector3d::UnitZ());
 
-      cur_pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
-      cur_pose.translation()[0] = traj_pos[0];
-      cur_pose.translation()[1] = traj_pos[1];
-      cur_pose.translation()[2] = traj_pos[2];
+      planning_uav_state_.pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();
+      planning_uav_state_.pose.translation()[0] = traj_pos[0];
+      planning_uav_state_.pose.translation()[1] = traj_pos[1];
+      planning_uav_state_.pose.translation()[2] = traj_pos[2];
 
-      transformer_.setMatrices(cur_pose);
+      transformer_.setMatrices(planning_uav_state_.pose);
 
       // update current velocity
-      cur_vel[0] = traj_vel[0];
-      cur_vel[1] = traj_vel[1];
-      cur_vel[2] = traj_vel[2];
+      planning_uav_state_.velocity[0] = traj_vel[0];
+      planning_uav_state_.velocity[1] = traj_vel[1];
+      planning_uav_state_.velocity[2] = traj_vel[2];
     }
 
     // calculate distance 2 ground
-    d2g[0] = cur_pose.translation()[2] - 0;
-    d2g_dot[0] = cur_vel[2];
+    d2g[0] = planning_uav_state_.pose.translation()[2] - 0;
+    d2g_dot[0] = planning_uav_state_.velocity[2];
 
     // get u, v, d and normalization constant for velocity from transformer which was updated above with the pose currently looked at
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
@@ -438,7 +460,7 @@ void RMPPlanner::planTrajectory(){
 
     // get the velocities
     Eigen::Matrix<double, 3, 1> image_vel =
-             transformer_.VelWorld2Image(cur_target_pos_, cur_vel, vel_normalization);
+             transformer_.VelWorld2Image(cur_target_pos_, planning_uav_state_.velocity, vel_normalization);
     u_v_dot[0] = image_vel[0];
     u_v_dot[1] = image_vel[1];
     d_dot[0] = image_vel[2];
@@ -451,23 +473,12 @@ void RMPPlanner::planTrajectory(){
     double a_max_C = sqrt(image_max_acc[0] * image_max_acc[0] + image_max_acc[1] * image_max_acc[1]);
     camera_policy.setMaxAcc(a_max_C);
 
-    // update the weights
-    this->updateWeights(u_v[0], u_v[1], d[0]);
-
     // fill the metric for the camera policy
-    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
-    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (cur_pose.translation()[2] - cur_target_pos_[2]) / (cur_pose.translation()[2] - cur_target_pos_[2]);
+    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
+    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
     A_camera(0, 0) = a_u_ / divider_u;
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
-
-    // fill the metric for the distance policy
-    A_distance(0, 0) = a_d_;
-    distance_policy.setA(A_distance);
-
-    // fill the metric for the distance2ground policy
-    A_distance2ground(0, 0) = a_d2g_;
-    distance2ground_policy.setA(A_distance2ground);
 
     // set maximum acceleration in distance and distance2ground policy
     distance_policy.setMaxAcc(a_max_W_);
@@ -506,73 +517,6 @@ void RMPPlanner::planTrajectory(){
   chrono_t2_ = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
   // std::cout << "Duration: " << duration << " microseconds" << std::endl;
-}
-
-void RMPPlanner::updateWeights(double u, double v, double d){
-  // default values
-  a_u_ = 1.0;
-  a_v_ = 1.0;
-  a_d_ = 2.0;
-  a_d2g_ = 0.0;
-
-  // variables necessary to evaluate state
-  u = abs(u);
-  v = abs(v);
-  d = abs(d);
-  std::vector<double> u_grid;
-  std::vector<double> v_grid;
-  for(double i = 0; i <= 5; i++){
-    u_grid.push_back(i / 5 * image_width_px_);
-    v_grid.push_back(i / 5 * image_height_px_);
-  }
-
-  int u_seq = 0;
-  int v_seq = 0;
-  for(int j = 0; j < 5; j++){
-    if(u >= u_grid[j] && u <= u_grid[j + 1]){
-      u_seq = j + 1;
-    }
-    if(v >= v_grid[j] && v <= v_grid[j + 1]){
-      v_seq = j + 1;
-    }
-    if(j == 4 && (u_seq == 0 || v_seq == 0)){
-      ROS_WARN_STREAM("MP ----- FOR LOOP FOR DETERMINING WEIGHTS FAILED");
-    }
-  }
-
-  if(u_seq == 4){
-    // a_u_ = 5;
-    a_u_ = 2;
-  }
-  else if(u_seq == 5){
-    // a_u_ = 10;
-    a_u_ = 5;
-  }
-
-  if(v_seq == 4){
-    // a_v_ = 5;
-    a_v_ = 2;
-  }
-  else if(v_seq == 5){
-    // a_v_ = 10;
-    a_v_ = 5;
-  }
-
-  if(v_seq == 1 && u_seq == 1){
-    a_d_ = 10;
-  }
-  else if((v_seq == 2 && u_seq == 2) || (v_seq == 1 && u_seq == 2) || (v_seq == 2 && u_seq == 1)){
-    a_d_ = 5;
-  }
-
-  if(planning_uav_state_.position[2] < 2){
-    a_d2g_ = 100;
-  }
-  else{
-    a_d2g_ = 0;
-  }
-
-  // std::cout << "a_u_: " << a_u_ << ", a_v_: " << a_v_ << ", a_d_: " << a_d_ << ", a_d2g_: " << a_d2g_ << std::endl;
 }
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
@@ -730,7 +674,7 @@ bool RMPPlanner::accuracy_reached(const Eigen::Vector3d& goal_pos, double max_ti
   while(time_since_pub < max_time){
     // determine position where drone currently is
     Eigen::Vector3d position_now;
-    position_now = physical_uav_state_.position;
+    position_now = physical_uav_state_.pose.translation();
 
     // determine current distance to target
     double distance = std::sqrt(std::pow((goal_pos[0] - position_now[0]), 2) +

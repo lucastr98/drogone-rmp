@@ -28,10 +28,9 @@ namespace drogone_rmp_planner {
 
 struct UAVState {
   ros::Time timestamp;
-  Eigen::Vector3d position;
+  Eigen::Affine3d pose;
   Eigen::Vector3d velocity;
   Eigen::Vector3d acceleration;
-  Eigen::Quaterniond orientation;
   double yaw;
   double yaw_vel;
   double yaw_acc;
@@ -100,6 +99,7 @@ class RMPPlanner{
 
     Eigen::Vector3d cur_target_pos_;
     Eigen::Vector3d last_target_pos_;
+    Eigen::Vector3d cur_target_vel_;
 
     // parameters that are changed depending on which state the uav is in
     double u_target_;
