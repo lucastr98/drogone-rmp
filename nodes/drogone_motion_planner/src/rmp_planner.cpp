@@ -204,6 +204,9 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     planning_uav_state_ = trajectory_uav_state_;
   }
 
+  // set target_passed_ false again if the target is passed the replanning stops anyway
+  target_passed_ = false;
+
   // stop planning if goal is reached
   if(victim_pos.d < 0.5){
     // take ownership of the mutex (unlock mutex from the lock in Follow())
@@ -215,9 +218,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
     return;
   }
-
-  // set target_passed_ false again if the target is passed the replanning stops anyway
-  target_passed_ = false;
 
   // store time of detection
   time_of_last_detection_ = victim_pos.header.stamp;
@@ -499,7 +499,7 @@ void RMPPlanner::planTrajectory(){
     // if the target is passed change the distance policy
     Eigen::Vector3d uav_pos;
     uav_pos << traj_pos[0], traj_pos[1], traj_pos[2];
-    if((cur_target_pos_ - uav_pos).norm() < 0.1 && !target_passed_){
+    if(cur_target_pos_[2] - uav_pos[2] < 0 && !target_passed_){
       target_passed_ = true;
     }
 

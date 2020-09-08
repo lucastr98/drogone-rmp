@@ -33,7 +33,7 @@ class VictimDrone(object):
         self.dt_dur= rospy.Duration(self.dt)
         #starting point
         self.starting_point = Point()
-        self.starting_point.x = 3.0 #**
+        self.starting_point.x = 0.0 #**
         self.starting_point.y = 0.0 #**
         self.starting_point.z = 15.0 #**
 
