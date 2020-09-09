@@ -570,7 +570,6 @@ class VictimDrone(object):
         #save drogone odometry
         self.drogone_odom = data
 
-
 if __name__ == '__main__':
 
     # #wait 3 seconds till everyhthing starts up

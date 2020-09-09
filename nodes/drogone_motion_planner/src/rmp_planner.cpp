@@ -252,32 +252,37 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   planning_uav_state_.pose.linear() = (rollAngle * yawAngle * pitchAngle).toRotationMatrix();   // update planning_uav_state_ with roll = pitch = 0
   transformer_.setMatrices(planning_uav_state_.pose);
   std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
-           transformer_.PosWorld2Image(cur_target_pos_);
+           transformer_.PosWorld2Image(cur_target_pos_, false);
   double u = abs(image_pair.first[0]);
   double v = abs(image_pair.first[1]);
   double d = abs(image_pair.first[2]);
+  // ROS_WARN_STREAM(u);
 
-  // default values
-  a_u_ = 1.0;
-  a_v_ = 1.0;
-  // a_d_ = 2.0;
-  a_d2g_ = 0.0;
-
-  if(u < 150){
-    a_d_ = 10.0;
-    d_target_ = 0.0;
+  if(u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0)){
+    mode_ = "catch";
   }
   else{
     if(a_d_ == 10.0){
-      if(u > 800){
-        a_d_ = 2.0;
-        d_target_ = 2.0;
+      if(u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0)){
+        mode_ = "follow";
       }
     }
     else{
-      a_d_ = 2.0;
-      d_target_ = 2.0;
+      mode_ = "follow";
     }
+  }
+
+  if(mode_ == "catch"){
+    a_d_ = 10.0;
+    d_target_ = 0.0;
+    a_u_ = 1.0;
+    a_v_ = 1.0;
+  }
+  else if(mode_ == "follow"){
+    a_d_ = 2.0;
+    d_target_ = 2.0;
+    a_u_ = 1.0;
+    a_v_ = 1.0;
   }
 
   if(planning_uav_state_.pose.translation()[2] < 2){
@@ -452,7 +457,7 @@ void RMPPlanner::planTrajectory(){
 
     // get u, v, d and normalization constant for velocity from transformer which was updated above with the pose currently looked at
     std::pair<Eigen::Matrix<double, 3, 1>, double> image_pair =
-             transformer_.PosWorld2Image(cur_target_pos_);
+             transformer_.PosWorld2Image(cur_target_pos_, false);
     u_v[0] = image_pair.first[0];
     u_v[1] = image_pair.first[1];
     d[0] = image_pair.first[2];
@@ -589,6 +594,8 @@ void RMPPlanner::publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
 
 bool RMPPlanner::Land(){
   ROS_WARN_STREAM("MP ----- LAND");
+
+  ros::Duration(5.0).sleep();
 
   Eigen::Vector3d land_pos;
   land_pos << 0.0, 0.0, 2.0;

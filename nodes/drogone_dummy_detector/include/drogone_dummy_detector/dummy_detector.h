@@ -44,6 +44,13 @@ class DummyDetector{
     double h_;
 
     drogone_transformation_lib::Transformations transformer_;
+
+    // noise parameters
+    bool noise_;
+    double d_drone_;
+    double tol_u_;
+    double tol_v_;
+    double tol_d_;
 };
 
 } // namespace drogone_motion_planning

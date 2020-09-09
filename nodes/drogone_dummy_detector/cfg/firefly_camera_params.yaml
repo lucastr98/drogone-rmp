@@ -9,3 +9,9 @@ roll: 0
 pitch: 0
 yaw: 0
 translation: [0.0, 0.0, 0.0]
+
+noise: True
+d_drone: 0.4
+tol_u: 2.0
+tol_v: 2.0
+tol_d: 1.0

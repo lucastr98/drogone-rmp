@@ -10,6 +10,7 @@ void Transformations::setCameraConfig(PinholeConstants pinhole_constants, Camera
 }
 
 void Transformations::setMatrices(Eigen::Affine3d uav_pose){
+  uav_pose_ = uav_pose;
   // define camera pose w.r.t. body in correct variables
   double roll_C_B, pitch_C_B, yaw_C_B;
   roll_C_B = camera_mounting_.roll * M_PI / 180;
@@ -19,14 +20,13 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
 
   // define body pose w.r.t. world in correct variables
   double roll_B_W, pitch_B_W, yaw_B_W;
-  Eigen::Quaterniond q(uav_pose.linear());
+  Eigen::Quaterniond q(uav_pose_.linear());
   roll_B_W = atan2(2.0 * (q.w() * q.x() + q.y() * q.z()),
                    1.0 - 2.0 * (q.x() * q.x() + q.y() * q.y()));
   pitch_B_W = 2.0 * (q.w() * q.y() - q.z() * q.x());
-  if(abs(pitch_B_W) >= 1.0){ ROS_WARN_STREAM("TAKE WHOLE DEF FROM WIKI FOR PITCH"); }
   yaw_B_W = atan2(2.0 * (q.w() * q.z() + q.x() * q.y()),
                   1.0 - 2.0 * (q.y() * q.y() - q.z() * q.z()));
-  Eigen::Vector3d t_B_W = uav_pose.translation();
+  Eigen::Vector3d t_B_W = uav_pose_.translation();
 
   R_C_B_ << cos(pitch_C_B) * cos(yaw_C_B),
              cos(pitch_C_B) * sin(yaw_C_B),
@@ -78,18 +78,36 @@ void Transformations::setMatrices(Eigen::Affine3d uav_pose){
   K_inv_(1, 0) = 0.0;
   K_inv_(2, 0) = 0.0;
   K_inv_(2, 1) = 0.0;
-
-  // set uav_position
-  uav_pos_ = uav_pose.translation();
 }
 
 // pair: (normalized u and v, normalization constant (z-distance))
-std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(Eigen::Vector3d target_W){
+std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(Eigen::Vector3d target_W, bool noise){
   // calculate target pos in camera frame
   Eigen::Affine3d target_pose_W, target_pose_C;
   target_pose_W.translation() = target_W;
   target_pose_C = T_C_B_ * T_B_W_ * target_pose_W;
   Eigen::Vector3d target_C = target_pose_C.translation();
+
+
+  if(noise){
+    // calculate stddev of x and y
+    double s_x_C = abs(target_C[2] * tol_u_ / pinhole_constants_.f_x);
+    double s_y_C = abs(target_C[2] * tol_v_ / pinhole_constants_.f_y);
+    double s_z_C = abs(d_drone_ * pinhole_constants_.f_x * abs(1 / (tol_d_ + pinhole_constants_.f_x * (d_drone_ / target_C[2])) - 1 / (pinhole_constants_.f_x * d_drone_ / target_C[2])));
+
+    rand_noise_x_C_ = std::normal_distribution<double>(0.0, s_x_C);
+    rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C);
+    rand_noise_z_C_ = std::normal_distribution<double>(0.0, s_z_C);
+
+    std::cout << target_C[0] << ", " << target_C[1] << ", " << target_C[2] << std::endl;
+
+    target_C[0] += rand_noise_x_C_(rand_gen_);
+    target_C[1] += rand_noise_y_C_(rand_gen_);
+    target_C[2] += rand_noise_z_C_(rand_gen_);
+
+    std::cout << target_C[0] << ", " << target_C[1] << ", " << target_C[2] << std::endl;
+    std::cout << " " << std::endl;
+  }
 
   // get u, v from camera matrix and target position in camera frame
   Eigen::Vector3d u_v;
@@ -102,10 +120,12 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
 
   // calculate distance to have full detection
   Eigen::Matrix<double, 3, 1> detection;
-  double distance = (target_W - uav_pos_).norm();
+  // double distance = (target_W - uav_pose_.translation()).norm();
+  double distance = std::sqrt(target_C[0] * target_C[0] + target_C[1] * target_C[1] + target_C[2] * target_C[2]);
   detection[0] = u_v_normalized[0];
   detection[1] = u_v_normalized[1];
   detection[2] = distance;
+
 
   // create the pair (normalized u and v, normalization constant) to return
   std::pair<Eigen::Matrix<double, 3, 1>, double> return_pair;
@@ -134,7 +154,7 @@ Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d targ
 
   // calculate velocity in distance
   Eigen::Vector3d connection_vec;
-  connection_vec = target_pos_W - uav_pos_;
+  connection_vec = target_pos_W - uav_pose_.translation();
   double d_dot = -connection_vec.dot(uav_vel);
   Eigen::Matrix<double, 3, 1> image_vel;
   image_vel[0] = u_v_dot_normalized[0];
@@ -169,6 +189,14 @@ Eigen::Vector3d Transformations::PosImage2World(Eigen::Matrix<double, 3, 1> dete
   Eigen::Vector3d target_W = target_pose_W.translation();
 
   return target_W;
+}
+
+// set noise parameters
+void Transformations::setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d){
+  d_drone_ = d_drone;
+  tol_u_ = tol_u;
+  tol_v_ = tol_v;
+  tol_d_ = tol_d;
 }
 
 } // namespace drogone_transformation_lib

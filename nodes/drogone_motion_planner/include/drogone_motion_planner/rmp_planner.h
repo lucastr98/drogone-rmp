@@ -101,6 +101,8 @@ class RMPPlanner{
     Eigen::Vector3d last_target_pos_;
     Eigen::Vector3d cur_target_vel_;
 
+    std::string mode_;
+
     // parameters that are changed depending on which state the uav is in
     double u_target_;
     double v_target_;

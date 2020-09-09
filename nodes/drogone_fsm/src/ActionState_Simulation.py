@@ -20,11 +20,9 @@ def child_term_cb1(outcome_map):
 def child_term_cb2(outcome_map):
     # terminates all running states if state GUI finished with outcome 'succeeded' or 'aborted'
     if outcome_map['GUI'] == 'succeeded' or outcome_map['GUI'] == 'aborted' or outcome_map['Check'] == 'succeeded':
-        rospy.logwarn("true")
         return True
     # in all other case, just keep running, don't terminate anything (e.g. if Motion planner finished)
     else:
-        rospy.logwarn("false")
         return False
 
 # # gets called when ANY child state terminates
@@ -152,8 +150,8 @@ def main():
 
         smach.StateMachine.add('Follow', sm_Follow,
                                 transitions={'Lost':'WaitforAutonomous',
-                                             'Followed':'Catch',
-                                             'Caught':'WaitforInstruction'
+                                             'Followed':'Land',
+                                             'Caught':'Land',
                                              })
 
 

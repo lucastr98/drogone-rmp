@@ -54,7 +54,7 @@ class DistanceTargetPolicy : public PolicyBase<n> {
       this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
     }
     else{
-      this->f_ = s(this->space_->minus(target_, x)) * max_acc_ + beta_ * x_dot;
+      this->f_[0] = 0;
     }
   }
 

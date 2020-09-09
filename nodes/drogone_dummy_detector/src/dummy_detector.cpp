@@ -53,6 +53,22 @@ DummyDetector::DummyDetector(ros::NodeHandle nh, ros::NodeHandle nh_private):
     }
     camera_mounting_.translation << cam_trans[0], cam_trans[1], cam_trans[2];
 
+    if(!nh_private_.getParam("noise", noise_)){
+      ROS_ERROR("failed to load noise");
+    }
+    if(!nh_private_.getParam("d_drone", d_drone_)){
+      ROS_ERROR("failed to load d_drone");
+    }
+    if(!nh_private_.getParam("tol_u", tol_u_)){
+      ROS_ERROR("failed to load tol_u");
+    }
+    if(!nh_private_.getParam("tol_v", tol_v_)){
+      ROS_ERROR("failed to load tol_v");
+    }
+    if(!nh_private_.getParam("tol_d", tol_d_)){
+      ROS_ERROR("failed to load tol_d");
+    }
+
     uav_state_.velocity << 0.0, 0.0, 0.0;
 
     transformer_.setCameraConfig(pinhole_constants_, camera_mounting_);
@@ -108,7 +124,8 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   uav_pose.translation() = uav_state_.position;
   uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
   transformer_.setMatrices(uav_pose);
-  Eigen::Matrix<double, 3, 1> detection = transformer_.PosWorld2Image(target_pos_W).first;
+  transformer_.setNoiseParams(d_drone_, tol_u_, tol_v_, tol_d_);
+  Eigen::Matrix<double, 3, 1> detection = transformer_.PosWorld2Image(target_pos_W, noise_).first;
 
   // publish (u, v, d)
   this->publish_detection(detection, victim_traj.header.stamp.sec + victim_traj.header.stamp.nsec/1e9);
