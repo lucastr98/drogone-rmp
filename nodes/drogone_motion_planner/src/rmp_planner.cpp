@@ -234,6 +234,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // calculate approx velocity from current and last position
   if(first_detection_){
     cur_target_vel_ << 0.0, 0.0, 0.0;
+    mode_ = "follow";
   }
   else{
     cur_target_vel_ = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
@@ -257,34 +258,40 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   double u = abs(image_pair.first[0]);
   double v = abs(image_pair.first[1]);
   double d = abs(image_pair.first[2]);
-  // ROS_WARN_STREAM(u);
 
-  if(u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0)){
+  if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
-  else{
-    if(mode_ == "catch"){
-      if(u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0)){
-        mode_ = "follow";
-      }
-    }
-    else{
-      mode_ = "follow";
-    }
+  else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
+    mode_ = "recover";
+  }
+  else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    mode_ = "follow";
   }
 
   if(mode_ == "catch"){
     a_d_ = 8.0;
     d_target_ = 0.0;
-    a_u_ = 1.0;
-    a_v_ = 1.0;
+    a_u_ = 6.0 / 7.0; //1.0;
+    a_v_ = 8.0 / 7.0; //1.0;
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
     d_target_ = 2.0;
-    a_u_ = 1.0;
-    a_v_ = 1.0;
+    a_u_ = 6.0 / 7.0; //1.0;
+    a_v_ = 8.0 / 7.0; //1.0;
   }
+  else if(mode_ == "recover"){
+    a_d_ = 0.0;
+    a_u_ = 6.0 / 7.0; //1.0;
+    a_v_ = 8.0 / 7.0; //1.0;
+  }
+
+  std::cout << mode_ << std::endl;
+  std::cout << u << ", " << v << std::endl;
 
   if(planning_uav_state_.pose.translation()[2] < 2){
     a_d2g_ = 100;
@@ -295,13 +302,10 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   if(first_detection_){
     a_d_ = 0.0;
+    first_detection_ = false;
   }
 
   /* SET THE POLICY VARIABLES */
-  // assuming beta = 3 is optimal for a target vel of 2 or smaller
-  // and beta = 1 is optimal for a target vel of 5 or bigger
-  // and in between the dependency is linear.
-  // calculate beta as a linear interpolation of this
   uv_beta_ = 1.5;
   u_target_ = 0.0;
   v_target_ = 0.0;
@@ -317,11 +321,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // store current target position in the last target position variable for the next iteration
   last_target_pos_ = cur_target_pos_;
-
-  // during the first detection, store that it's not the first detection anymore
-  if(first_detection_){
-    first_detection_ = false;
-  }
 }
 
 void RMPPlanner::planTrajectory(){
