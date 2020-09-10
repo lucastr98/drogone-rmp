@@ -51,7 +51,12 @@ class CameraTargetPolicy : public PolicyBase<n> {
   CameraTargetPolicy(Vector target) : target_(target) {}
 
   virtual void setState(const Vector &x, const Vector &x_dot) override {
-    this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    if(!target_passed_){
+      this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
+    }
+    else{
+      this->f_ = Vector::Zero();
+    }
   }
 
   std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
@@ -78,6 +83,10 @@ class CameraTargetPolicy : public PolicyBase<n> {
     return this->f_;
   }
 
+  void setTargetPassed(bool target_passed){
+    target_passed_ = target_passed;
+  }
+
  protected:
   /**
    *  Normalization helper function.
@@ -93,6 +102,7 @@ class CameraTargetPolicy : public PolicyBase<n> {
   double beta_{8.0}, c_{0.005};
   double sigma_{sqrt((1024 / 2) * (1024 / 2) + (768 / 2) * (768 / 2))};
   double max_acc_ = 200;
+  bool target_passed_;
 };
 
 }  // namespace rmpcpp
