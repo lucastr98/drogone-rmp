@@ -209,7 +209,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // stop planning if goal is reached
   if(victim_pos.d < 0.5){
-    ROS_WARN_STREAM("MP ----- CAUGHT?!");
+    ROS_WARN_STREAM("MP ----- FINISHED PLANNING");
     // take ownership of the mutex (unlock mutex from the lock in Follow())
     std::lock_guard<std::mutex> guard(mutex_);
     // notify the condition variable to stop waiting (in Follow())
@@ -266,6 +266,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
     mode_ = "recover";
+    // ROS_WARN_STREAM()
   }
   else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
@@ -273,25 +274,22 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   if(mode_ == "catch"){
-    a_d_ = 8.0;
+    a_d_ = 5.0;
     d_target_ = 0.0;
-    a_u_ = 6.0 / 7.0; //1.0;
-    a_v_ = 8.0 / 7.0; //1.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
     d_target_ = 2.0;
-    a_u_ = 6.0 / 7.0; //1.0;
-    a_v_ = 8.0 / 7.0; //1.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
   }
   else if(mode_ == "recover"){
     a_d_ = 0.0;
-    a_u_ = 6.0 / 7.0; //1.0;
-    a_v_ = 8.0 / 7.0; //1.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
   }
-
-  std::cout << mode_ << std::endl;
-  std::cout << u << ", " << v << std::endl;
 
   if(planning_uav_state_.pose.translation()[2] < 2){
     a_d2g_ = 100;
@@ -311,7 +309,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   v_target_ = 0.0;
   uv_c_ = 0.05;
   // d_target_ = 2.0;
-  d_beta_ = 1.6;
+  d_beta_ = 1.5;
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
