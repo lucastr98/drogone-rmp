@@ -209,6 +209,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // stop planning if goal is reached
   if(victim_pos.d < 0.5){
+    ROS_WARN_STREAM("MP ----- FINISHED PLANNING");
     // take ownership of the mutex (unlock mutex from the lock in Follow())
     std::lock_guard<std::mutex> guard(mutex_);
     // notify the condition variable to stop waiting (in Follow())
@@ -233,6 +234,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // calculate approx velocity from current and last position
   if(first_detection_){
     cur_target_vel_ << 0.0, 0.0, 0.0;
+    mode_ = "follow";
   }
   else{
     cur_target_vel_ = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
@@ -256,33 +258,36 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   double u = abs(image_pair.first[0]);
   double v = abs(image_pair.first[1]);
   double d = abs(image_pair.first[2]);
-  // ROS_WARN_STREAM(u);
 
-  if(u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0)){
+  if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
-  else{
-    if(a_d_ == 10.0){
-      if(u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0)){
-        mode_ = "follow";
-      }
-    }
-    else{
-      mode_ = "follow";
-    }
+  else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
+    mode_ = "recover";
+  }
+  else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    mode_ = "follow";
   }
 
   if(mode_ == "catch"){
-    a_d_ = 10.0;
+    a_d_ = 5.0;
     d_target_ = 0.0;
-    a_u_ = 1.0;
-    a_v_ = 1.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
   }
   else if(mode_ == "follow"){
-    a_d_ = 2.0;
+    a_d_ = 1.0;
     d_target_ = 2.0;
-    a_u_ = 1.0;
-    a_v_ = 1.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
+  }
+  else if(mode_ == "recover"){
+    a_d_ = 0.0;
+    a_u_ = 1.0; //6.0 / 7.0;
+    a_v_ = 1.0; //8.0 / 7.0;
   }
 
   if(planning_uav_state_.pose.translation()[2] < 2){
@@ -292,25 +297,20 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_d2g_ = 0;
   }
 
+  if(first_detection_){
+    if(mode_ == "follow"){
+      ROS_WARN_STREAM("MP ----- FOLLOW MODE");
+    }
+    a_d_ = 0.0;
+    first_detection_ = false;
+  }
+
   /* SET THE POLICY VARIABLES */
-  // assuming beta = 3 is optimal for a target vel of 2 or smaller
-  // and beta = 1 is optimal for a target vel of 5 or bigger
-  // and in between the dependency is linear.
-  // calculate beta as a linear interpolation of this
-  if(cur_target_vel_.norm() <= 2){
-    uv_beta_ = 3.0;
-  }
-  else if(cur_target_vel_.norm() >= 5){
-    uv_beta_ = 1.0;
-  }
-  else{
-    uv_beta_ = 3 + (cur_target_vel_.norm() - 2) * (1 - 3) / (5 - 2);
-  }
+  uv_beta_ = 3.0;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  // d_target_ = 2.0;
-  d_beta_ = 1.6;
+  d_beta_ = 3.0;
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
@@ -320,11 +320,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // store current target position in the last target position variable for the next iteration
   last_target_pos_ = cur_target_pos_;
-
-  // during the first detection, store that it's not the first detection anymore
-  if(first_detection_){
-    first_detection_ = false;
-  }
 }
 
 void RMPPlanner::planTrajectory(){
@@ -415,6 +410,9 @@ void RMPPlanner::planTrajectory(){
   // set current position in Q for jacobian calculation of both geometries
   task_space_camera_geometry.setQ(pos);
   task_space_distance_geometry.setQ(pos);
+
+  // set mode for camera jacobian
+  task_space_camera_geometry.setMode(mode_);
 
   // create msg and define sampling interval & MPC_horizon
   trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
