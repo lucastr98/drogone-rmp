@@ -491,6 +491,7 @@ void RMPPlanner::planTrajectory(){
 
     // set whether or not the target is passed
     distance_policy.setTargetPassed(target_passed_);
+    camera_policy.setTargetPassed(target_passed_);
 
     // calculate acceleration
     integrator.setX(u_v, u_v_dot, d, d_dot, d2g, d2g_dot);
