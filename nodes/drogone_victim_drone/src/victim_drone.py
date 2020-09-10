@@ -23,7 +23,7 @@ class VictimDrone(object):
         self.initialize = 1
 
         #--------------------------------------------------------basic variables--------------------------------------------------
-        self.velocity = 4.0 #** #velocity of victim drone
+        self.velocity = 2.0 #** #velocity of victim drone
         self.velocity_fix = self.velocity #for velocity variation
         self.velocity_spread = 0 #0.08 #** #velocity variation. set to zero if no velocity change is wanted
         self.velocity_max = 5 #maximum velocity for varaition

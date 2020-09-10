@@ -266,7 +266,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
     mode_ = "recover";
-    // ROS_WARN_STREAM()
   }
   else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
@@ -299,17 +298,19 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   if(first_detection_){
+    if(mode_ == "follow"){
+      ROS_WARN_STREAM("MP ----- FOLLOW MODE");
+    }
     a_d_ = 0.0;
     first_detection_ = false;
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 1.5;
+  uv_beta_ = 3.0;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  // d_target_ = 2.0;
-  d_beta_ = 1.5;
+  d_beta_ = 3.0;
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
