@@ -207,6 +207,8 @@ def linear_path_callback():
             parameters.data[6] = 1
 
         pub_victim.publish(parameters)
+        rospy.sleep(0.2)
+        command_1_callback()
 
 #circular moving drone
 def circular_path_callback():
@@ -222,6 +224,8 @@ def circular_path_callback():
         if not len(victim_drone_theta.get()) == 0:
             parameters.data[14] = float(victim_drone_theta.get())
         pub_victim.publish(parameters)
+        rospy.sleep(0.2)
+        command_1_callback()
 
 #eight path moving drone
 def eight_path_callback():
@@ -254,6 +258,8 @@ def random_path_callback():
         if not len(victim_drone_phi_width.get()) == 0:
             parameters.data[17] = float(victim_drone_phi_width.get())
         pub_victim.publish(parameters)
+        rospy.sleep(0.2)
+        command_1_callback()
 
 #stop drone
 def stop_path_callback():

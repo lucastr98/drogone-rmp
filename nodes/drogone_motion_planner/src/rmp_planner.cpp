@@ -209,6 +209,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // stop planning if goal is reached
   if(victim_pos.d < 0.5){
+    ROS_WARN_STREAM("MP ----- CAUGHT?!");
     // take ownership of the mutex (unlock mutex from the lock in Follow())
     std::lock_guard<std::mutex> guard(mutex_);
     // notify the condition variable to stop waiting (in Follow())
@@ -262,7 +263,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     mode_ = "catch";
   }
   else{
-    if(a_d_ == 10.0){
+    if(mode_ == "catch"){
       if(u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0)){
         mode_ = "follow";
       }
@@ -273,13 +274,13 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   if(mode_ == "catch"){
-    a_d_ = 10.0;
+    a_d_ = 8.0;
     d_target_ = 0.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
   else if(mode_ == "follow"){
-    a_d_ = 2.0;
+    a_d_ = 1.0;
     d_target_ = 2.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
@@ -292,20 +293,16 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_d2g_ = 0;
   }
 
+  if(first_detection_){
+    a_d_ = 0.0;
+  }
+
   /* SET THE POLICY VARIABLES */
   // assuming beta = 3 is optimal for a target vel of 2 or smaller
   // and beta = 1 is optimal for a target vel of 5 or bigger
   // and in between the dependency is linear.
   // calculate beta as a linear interpolation of this
-  if(cur_target_vel_.norm() <= 2){
-    uv_beta_ = 3.0;
-  }
-  else if(cur_target_vel_.norm() >= 5){
-    uv_beta_ = 1.0;
-  }
-  else{
-    uv_beta_ = 3 + (cur_target_vel_.norm() - 2) * (1 - 3) / (5 - 2);
-  }
+  uv_beta_ = 1.5;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
@@ -415,6 +412,9 @@ void RMPPlanner::planTrajectory(){
   // set current position in Q for jacobian calculation of both geometries
   task_space_camera_geometry.setQ(pos);
   task_space_distance_geometry.setQ(pos);
+
+  // set mode for camera jacobian
+  task_space_camera_geometry.setMode(mode_);
 
   // create msg and define sampling interval & MPC_horizon
   trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;

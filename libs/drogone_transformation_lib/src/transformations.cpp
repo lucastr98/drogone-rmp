@@ -99,14 +99,9 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C);
     rand_noise_z_C_ = std::normal_distribution<double>(0.0, s_z_C);
 
-    std::cout << target_C[0] << ", " << target_C[1] << ", " << target_C[2] << std::endl;
-
     target_C[0] += rand_noise_x_C_(rand_gen_);
     target_C[1] += rand_noise_y_C_(rand_gen_);
     target_C[2] += rand_noise_z_C_(rand_gen_);
-
-    std::cout << target_C[0] << ", " << target_C[1] << ", " << target_C[2] << std::endl;
-    std::cout << " " << std::endl;
   }
 
   // get u, v from camera matrix and target position in camera frame
