@@ -51,7 +51,7 @@ class RMPPlanner{
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
     bool TakeOff();
-    bool SubDetection();
+    void SubDetection();
     void detection_callback(const drogone_msgs_rmp::target_detection& victim_pos);
     void planTrajectory();
     void updateWeights(double u, double v, double d);
@@ -98,8 +98,7 @@ class RMPPlanner{
     ros::Time time_of_last_detection_;
 
     Eigen::Vector3d cur_target_pos_;
-    Eigen::Vector3d last_target_pos_;
-    Eigen::Vector3d cur_target_vel_;
+    ros::Time follow_starting_time_;
 
     std::string mode_;
 

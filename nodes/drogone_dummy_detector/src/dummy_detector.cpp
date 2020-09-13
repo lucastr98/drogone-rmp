@@ -116,6 +116,9 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   double angle_y = atan2(target_pos_W[1] - uav_state_.position[1], target_pos_W[2] - uav_state_.position[2]);
   if(abs(angle_x) > fov_x / 2 || abs(angle_y) > fov_y / 2){
     ROS_WARN_STREAM("DUMMY DETECTOR ----- TARGET NOT IN FOV");
+    drogone_msgs_rmp::target_detection msg;
+    msg.detected.data = false;
+    pub_detection_.publish(msg);
     return;
   }
 
@@ -137,6 +140,7 @@ void DummyDetector::publish_detection(Eigen::Matrix<double, 3, 1> detection, dou
   msg.u = detection[0];
   msg.v = detection[1];
   msg.d = detection[2];
+  msg.detected.data = true;
   pub_detection_.publish(msg);
 }
 

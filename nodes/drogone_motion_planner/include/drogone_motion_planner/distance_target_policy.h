@@ -52,7 +52,7 @@ class DistanceTargetPolicy : public PolicyBase<n> {
   virtual void setState(const Vector &x, const Vector &x_dot) override {
     if(!target_passed_){
       this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
-      if(this->f_[0] > 0){
+      if(this->f_[0] > 0 && target_ == Vector::Zero()){
         this->f_ = Vector::Zero();
       }
     }

@@ -185,23 +185,47 @@ bool RMPPlanner::TakeOff(){
   }
 }
 
-bool RMPPlanner::SubDetection(){
+void RMPPlanner::SubDetection(){
   first_detection_ = true;
   sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::detection_callback, this);
+  follow_starting_time_ = ros::Time::now();
 
   // lock the mutex and wait until it is unlocked (in catch_traj, once last traj is calculated)
   std::unique_lock<std::mutex> uLock(mutex_);
   cond_var_.wait(uLock);
-  return true;
 }
 
 void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& victim_pos){
+  // check if fsm requests preemption
+  if(as_.isPreemptRequested()){
+    // take ownership of the mutex (unlock mutex from the lock in Follow())
+    std::lock_guard<std::mutex> guard(mutex_);
+    // notify the condition variable to stop waiting (in Follow())
+    cond_var_.notify_one();
+
+    sub_follow_.shutdown();
+    as_.setPreempted();
+    return;
+  }
+
+  // return right here if the target is not detected
+  if(victim_pos.detected.data == false){
+    return;
+  }
+
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
     planning_uav_state_ = physical_uav_state_;
   }
   else{
     planning_uav_state_ = trajectory_uav_state_;
+  }
+
+  // for evaluation stop following after a certain amount of seconds
+  ros::Time current_time = ros::Time::now();
+  if((current_time - follow_starting_time_).toSec() > 5.0){
+    ROS_WARN_STREAM("FINISHED");
+    return;
   }
 
   // set target_passed_ false again if the target is passed the replanning stops anyway
@@ -231,15 +255,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   detection << victim_pos.u, victim_pos.v, victim_pos.d;
   cur_target_pos_ = transformer_.PosImage2World(detection);
 
-  // calculate approx velocity from current and last position
-  if(first_detection_){
-    cur_target_vel_ << 0.0, 0.0, 0.0;
-    mode_ = "follow";
-  }
-  else{
-    cur_target_vel_ = (cur_target_pos_ - last_target_pos_) / (1 / frequency_);
-  }
-
   /* SET WEIGHTS */
   // calculate u, v and d with roll = pitch = 0 assumption
   Eigen::Quaterniond q(planning_uav_state_.pose.linear());
@@ -260,17 +275,18 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   double d = abs(image_pair.first[2]);
 
   if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0))){
-    ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
+    // ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
   else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
-    ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
+    // ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
     mode_ = "recover";
   }
   else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
-    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    // ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
+  mode_ = "follow";
 
   if(mode_ == "catch"){
     a_d_ = 5.0;
@@ -280,7 +296,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
-    d_target_ = 2.0;
+    d_target_ = 5.0;
     a_u_ = 1.0; //6.0 / 7.0;
     a_v_ = 1.0; //8.0 / 7.0;
   }
@@ -306,7 +322,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 3.0;
+  uv_beta_ = 2.5;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
@@ -317,9 +333,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // plan Trajectory with current weights
   this->planTrajectory();
-
-  // store current target position in the last target position variable for the next iteration
-  last_target_pos_ = cur_target_pos_;
 }
 
 void RMPPlanner::planTrajectory(){
@@ -645,10 +658,7 @@ void RMPPlanner::server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal
       as_.setPreempted();
     }
 
-    if(this->SubDetection()){
-      ROS_INFO("%s: Succeeded", action_name_.c_str());
-      as_.setSucceeded();
-    }
+    this->SubDetection();
   }
 
   if (goal_mode == "Land")

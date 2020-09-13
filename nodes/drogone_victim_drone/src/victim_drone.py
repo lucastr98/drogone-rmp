@@ -17,6 +17,11 @@ class VictimDrone(object):
 
     def __init__(self,name):
 
+        # calculate variables for randomization for evaluation
+        self.phi_eval = np.random.uniform(0, 2 * np.pi)
+        self.theta_eval = np.random.uniform(-np.pi / 6, np.pi / 6)
+        self.z_C_eval = np.random.uniform(5, 15)
+
         #parameters of the trajectory/path, params with ** at the end are changeable parameters (most of them are also changeable in the GUI)
         #--------------------------------------------------------help variables--------------------------------------------------
         self.start_moving = 0
@@ -532,7 +537,8 @@ class VictimDrone(object):
             self.delete_traj = 1
         #velocity
         if not data.data[1] == 0.0:
-            self.velocity = data.data[1]
+            # self.velocity = data.data[1]
+            self.velocity = 2
 
         #angle spread
         if not data.data[16] == 0.0:
@@ -550,13 +556,34 @@ class VictimDrone(object):
             self.caught = 0
             self.delete_traj = 1
 
+            # for evaluation
+            self.phi_eval = np.random.uniform(0, 2 * np.pi)
+            self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
+            self.z_C_eval = np.random.uniform(5, 15)
+            init_px_eval = 200
+            u_eval = np.cos(self.phi_eval) * init_px_eval
+            v_eval = np.sin(self.phi_eval) * init_px_eval
+            x_C_eval = u_eval / 1140 * self.z_C_eval
+            y_C_eval = v_eval / 1140 * self.z_C_eval
+            self.starting_point.x = x_C_eval
+            self.starting_point.y = y_C_eval
+            self.starting_point.z = self.z_C_eval + 10.0
+
         # vector of linear moving victim drone parameters
         elif data.data[6] == 1.0:
+            direction_x_eval = np.sin(self.theta_eval) * np.cos(self.phi_eval)
+            direction_y_eval = np.sin(self.theta_eval) * np.sin(self.phi_eval)
+            direction_z_eval = np.cos(self.theta_eval)
+            magnitude = np.sqrt(direction_x_eval*direction_x_eval + direction_y_eval*direction_y_eval + direction_z_eval*direction_z_eval)
+            self.motion_vector.x = direction_x_eval / magnitude
+            self.motion_vector.y = direction_y_eval / magnitude
+            self.motion_vector.z = direction_z_eval / magnitude
+
             #normalize vector
-            magnitude = np.sqrt(data.data[7]*data.data[7] + data.data[8]*data.data[8] + data.data[9]*data.data[9])
-            self.motion_vector.x = data.data[7]/ magnitude
-            self.motion_vector.y = data.data[8]/ magnitude
-            self.motion_vector.z = data.data[9]/ magnitude
+            # magnitude = np.sqrt(data.data[7]*data.data[7] + data.data[8]*data.data[8] + data.data[9]*data.data[9])
+            # self.motion_vector.x = data.data[7]/ magnitude
+            # self.motion_vector.y = data.data[8]/ magnitude
+            # self.motion_vector.z = data.data[9]/ magnitude
             self.delete_traj = 1
 
 

@@ -62,7 +62,8 @@ class GUIServer(object):
 
         elif goal.new_mode == "Catch":
             command_1.set("Victim Drone Caught")
-            command_2.set("Victim Drone Lost")
+            # command_2.set("Victim Drone Lost")
+            command_2.set("Restart")
 
         elif goal.new_mode == "WaitforInstruction":
             command_1.set("Land")
@@ -206,9 +207,11 @@ def linear_path_callback():
             parameters.data[9] = float(victim_drone_motion_vector_z.get())
             parameters.data[6] = 1
 
+        # for evaluation s.t. the random direction is always used
+        parameters.data[6] = 1
+
         pub_victim.publish(parameters)
-        rospy.sleep(0.4)
-        command_1_callback()
+        # command_1_callback()
 
 #circular moving drone
 def circular_path_callback():
@@ -257,9 +260,12 @@ def random_path_callback():
             parameters.data[16] = float(victim_drone_theta_width.get())
         if not len(victim_drone_phi_width.get()) == 0:
             parameters.data[17] = float(victim_drone_phi_width.get())
+
+        # for evaluation s.t. the random direction is always used
+        parameters.data[6] = 1
+
         pub_victim.publish(parameters)
-        rospy.sleep(0.4)
-        command_1_callback()
+        # command_1_callback()
 
 #stop drone
 def stop_path_callback():
@@ -283,7 +289,6 @@ def change_starting_point_callback():
             parameters.data[5] = float(starting_point_z.get())
 
         pub_victim.publish(parameters)
-
 
 if __name__ == '__main__':
     rospy.init_node('DroGone_GUI')
@@ -419,7 +424,6 @@ if __name__ == '__main__':
     starting_point_z = StringVar()
     starting_point_z.set("7")
     Entry(frame, textvariable = starting_point_z,  width = 5).grid(row=6, column=6)
-
 
     #initialize GUI Server class
     GUIServer = GUIServer("GUI")

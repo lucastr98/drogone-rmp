@@ -95,13 +95,30 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     double s_y_C = abs(target_C[2] * tol_v_ / pinhole_constants_.f_y);
     double s_z_C = abs(d_drone_ * pinhole_constants_.f_x * abs(1 / (tol_d_ + pinhole_constants_.f_x * (d_drone_ / target_C[2])) - 1 / (pinhole_constants_.f_x * d_drone_ / target_C[2])));
 
+    std::cout << "stddev -> x: " << s_x_C << ", y: " << s_y_C << ", z: " << s_z_C << std::endl;
+
     rand_noise_x_C_ = std::normal_distribution<double>(0.0, s_x_C);
     rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C);
     rand_noise_z_C_ = std::normal_distribution<double>(0.0, s_z_C);
+    new_rand_noise_x_C_ = std::normal_distribution<double>(0.0, s_x_C / 10);
+    new_rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C / 10);
+    new_rand_noise_z_C_ = std::normal_distribution<double>(0.0, s_z_C / 10);
 
-    target_C[0] += rand_noise_x_C_(rand_gen_);
-    target_C[1] += rand_noise_y_C_(rand_gen_);
-    target_C[2] += rand_noise_z_C_(rand_gen_);
+    double noise_x_adder = new_rand_noise_x_C_(rand_gen_);
+    double noise_y_adder = new_rand_noise_y_C_(rand_gen_);
+    double noise_z_adder = new_rand_noise_z_C_(rand_gen_);
+    std::cout << "noise adder -> x: " << noise_x_adder << ", y: " << noise_y_adder << ", z: " << noise_z_adder << std::endl;
+    new_noise_gen_x_ += noise_x_adder;
+    new_noise_gen_y_ += noise_y_adder;
+    new_noise_gen_z_ += noise_z_adder;
+
+    std::cout << "old one -> noise x: " << rand_noise_x_C_(rand_gen_) << " noise y: " << rand_noise_y_C_(rand_gen_) << " noise z: " << rand_noise_z_C_(rand_gen_) << std::endl;
+    std::cout << "new one -> noise x: " << new_noise_gen_x_ << " noise y: " << new_noise_gen_y_ << " noise z: " << new_noise_gen_z_ << std::endl;
+    std::cout << " " << std::endl;
+
+    // target_C[0] += rand_noise_x_C_(rand_gen_);
+    // target_C[1] += rand_noise_y_C_(rand_gen_);
+    // target_C[2] += rand_noise_z_C_(rand_gen_);
   }
 
   // get u, v from camera matrix and target position in camera frame
