@@ -129,6 +129,8 @@ def command_1_callback():
     if command_1.get() == "Take Off" or command_1.get() == "Catch Victim Drone"  or command_1.get() == "Land":
         job_done = 1
         pub.publish(job_done)
+        last_task.set("Autonomous Flying")
+        task_status.set("on")
 
     elif command_1.get() == "Start Autonomous Flying":
          job_done = 1
@@ -211,7 +213,7 @@ def linear_path_callback():
         parameters.data[6] = 1
 
         pub_victim.publish(parameters)
-        # command_1_callback()
+        command_1_callback()
 
 #circular moving drone
 def circular_path_callback():
@@ -265,7 +267,7 @@ def random_path_callback():
         parameters.data[6] = 1
 
         pub_victim.publish(parameters)
-        # command_1_callback()
+        command_1_callback()
 
 #stop drone
 def stop_path_callback():

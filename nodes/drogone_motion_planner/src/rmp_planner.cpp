@@ -223,7 +223,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // for evaluation stop following after a certain amount of seconds
   ros::Time current_time = ros::Time::now();
-  if((current_time - follow_starting_time_).toSec() > 5.0){
+  if((current_time - follow_starting_time_).toSec() > 15.0){
     ROS_WARN_STREAM("FINISHED");
     return;
   }

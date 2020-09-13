@@ -34,12 +34,9 @@ class Transformations{
     std::normal_distribution<double> rand_noise_x_C_;
     std::normal_distribution<double> rand_noise_y_C_;
     std::normal_distribution<double> rand_noise_z_C_;
-    std::normal_distribution<double> new_rand_noise_x_C_;
-    std::normal_distribution<double> new_rand_noise_y_C_;
-    std::normal_distribution<double> new_rand_noise_z_C_;
-    double new_noise_gen_x_ = 0.0;
-    double new_noise_gen_y_ = 0.0;
-    double new_noise_gen_z_ = 0.0;
+    double noise_gen_x_ = 0.0;
+    double noise_gen_y_ = 0.0;
+    double noise_gen_z_ = 0.0;
 };
 
 } // namespace drogone_transformation_lib
