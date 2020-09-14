@@ -2,3 +2,5 @@ rosbags:
   - test0
   - test1
   - test2
+time_tot: 14.0
+roll_pitch_zero: False
