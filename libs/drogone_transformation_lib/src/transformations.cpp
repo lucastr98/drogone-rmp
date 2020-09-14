@@ -162,6 +162,7 @@ Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d targ
   // calculate velocity in distance
   Eigen::Vector3d connection_vec;
   connection_vec = target_pos_W - uav_pose_.translation();
+  connection_vec = connection_vec.normalized();
   double d_dot = -connection_vec.dot(uav_vel);
   Eigen::Matrix<double, 3, 1> image_vel;
   image_vel[0] = u_v_dot_normalized[0];

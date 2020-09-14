@@ -8,9 +8,11 @@ import math
 bags = []
 with open(r'evaluation.yaml') as file:
     list = yaml.safe_load(file)
+    target_velocity = list['target_velocity']
+    flight_path = list['flight_path']
     rosbags = list['rosbags']
     for bag in rosbags:
-        bags.append(rosbag.Bag(bag + ".bag"))
+        bags.append(rosbag.Bag("/home/severin/luca_ws/rosbags/vel_" + target_velocity + "/" + flight_path + "/" + bag + ".bag"))
     time_tot = list['time_tot']
     roll_pitch_zero = list['roll_pitch_zero']
 
@@ -199,3 +201,6 @@ axes[1].plot(time, xy_mean)
 axes[1].fill_between(time, xy_mean_minus_stddev, xy_mean_plus_stddev, alpha=0.5)
 axes[1].grid()
 plt.show()
+
+
+# /firefly/command/trajectory /firefly/odometry_sensor1/odometry /victim_drone/odometry

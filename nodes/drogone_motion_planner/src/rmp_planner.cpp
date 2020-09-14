@@ -215,6 +215,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
+    mode_ = "follow";
     planning_uav_state_ = physical_uav_state_;
   }
   else{
@@ -223,7 +224,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   // for evaluation stop following after a certain amount of seconds
   ros::Time current_time = ros::Time::now();
-  if((current_time - follow_starting_time_).toSec() > 15.0){
+  if((current_time - follow_starting_time_).toSec() > 21.0){
     ROS_WARN_STREAM("FINISHED");
     return;
   }
@@ -289,21 +290,21 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   mode_ = "follow";
 
   if(mode_ == "catch"){
-    a_d_ = 5.0;
+    a_d_ = 3.0;
     d_target_ = 0.0;
-    a_u_ = 1.0; //6.0 / 7.0;
-    a_v_ = 1.0; //8.0 / 7.0;
+    a_u_ = 1.0;
+    a_v_ = 1.0;
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
     d_target_ = 5.0;
-    a_u_ = 1.0; //6.0 / 7.0;
-    a_v_ = 1.0; //8.0 / 7.0;
+    a_u_ = 1.0;
+    a_v_ = 1.0;
   }
   else if(mode_ == "recover"){
     a_d_ = 0.0;
-    a_u_ = 1.0; //6.0 / 7.0;
-    a_v_ = 1.0; //8.0 / 7.0;
+    a_u_ = 1.0;
+    a_v_ = 1.0;
   }
 
   if(planning_uav_state_.pose.translation()[2] < 2){
@@ -322,11 +323,11 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 2.5;
+  uv_beta_ = 2.8;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  d_beta_ = 3.0;
+  d_beta_ = 5.0;
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;

@@ -1,3 +1,5 @@
+target_velocity: trial
+flight_path: linear
 rosbags:
   - test0
   - test1

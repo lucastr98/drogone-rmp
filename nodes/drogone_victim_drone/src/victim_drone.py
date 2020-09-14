@@ -557,9 +557,12 @@ class VictimDrone(object):
             self.delete_traj = 1
 
             # for evaluation
-            self.phi_eval = np.random.uniform(0, 2 * np.pi)
-            self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
-            self.z_C_eval = np.random.uniform(5, 15)
+            self.phi_eval = 0
+            self.theta_eval = np.pi / 2
+            self.z_C_eval = 7
+            # self.phi_eval = np.random.uniform(0, 2 * np.pi)
+            # self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
+            # self.z_C_eval = np.random.uniform(5, 15)
             init_px_eval = 400
             u_eval = np.cos(self.phi_eval) * init_px_eval
             v_eval = np.sin(self.phi_eval) * init_px_eval
