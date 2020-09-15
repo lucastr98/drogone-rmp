@@ -165,7 +165,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << 0.0, 0.0, 10.0;
+  take_off_pos << 0.0, 0.0, 20.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -323,7 +323,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 2.8;
+  uv_beta_ = 2.9;
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;

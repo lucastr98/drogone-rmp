@@ -1,8 +1,22 @@
-target_velocity: trial
-flight_path: linear
+evaluation: follow
+target_velocity: two
+flight_path: random
+init_px_err: 400
 rosbags:
   - test0
   - test1
   - test2
-time_tot: 14.0
+  - test3
+  - test4
+  - test5
+  - test6
+  - test7
+  - test8
+  - test9
+  - test10
+  - test11
+  - test12
+  - test13
+  - test14
+time_tot: 20.0
 roll_pitch_zero: False
