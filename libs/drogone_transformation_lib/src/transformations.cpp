@@ -4,9 +4,10 @@ namespace drogone_transformation_lib{
 
 Transformations::Transformations(){};
 
-void Transformations::setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting){
+void Transformations::setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting, ros::NodeHandle nh){
   pinhole_constants_ = pinhole_constants;
   camera_mounting_ = camera_mounting;
+  pub_noise_ = nh.advertise<drogone_msgs_rmp::noise>("noise", 0);
 }
 
 void Transformations::setMatrices(Eigen::Affine3d uav_pose){
@@ -109,7 +110,18 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     noise_gen_z_ += noise_z_adder;
 
     // std::cout << "noisy pos -> x: " << target_C[0] + noise_gen_x_ << " y: " << target_C[1] + noise_gen_y_ << " z: " << target_C[2] + noise_gen_z_ << std::endl;
+    // std::cout << "noisy error -> x: " << noise_gen_x_ << ", y: " << noise_gen_y_ << ", z: " << noise_gen_z_ << std::endl;
     // std::cout << " " << std::endl;
+
+    drogone_msgs_rmp::noise noise_msg;
+    noise_msg.x_C = target_C[0];
+    noise_msg.y_C = target_C[1];
+    noise_msg.z_C = target_C[2];
+    noise_msg.noise_x_C = noise_gen_x_;
+    noise_msg.noise_y_C = noise_gen_y_;
+    noise_msg.noise_z_C = noise_gen_z_;
+    noise_msg.header.stamp = ros::Time::now();
+    pub_noise_.publish(noise_msg);
 
     target_C[0] += noise_gen_x_;
     target_C[1] += noise_gen_y_;
@@ -200,11 +212,16 @@ Eigen::Vector3d Transformations::PosImage2World(Eigen::Matrix<double, 3, 1> dete
 }
 
 // set noise parameters
-void Transformations::setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d){
+void Transformations::setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d, bool reset_noise){
   d_drone_ = d_drone;
   tol_u_ = tol_u;
   tol_v_ = tol_v;
   tol_d_ = tol_d;
+  if(reset_noise){
+    noise_gen_x_ = 0.0;
+    noise_gen_y_ = 0.0;
+    noise_gen_z_ = 0.0;
+  }
 }
 
 } // namespace drogone_transformation_lib

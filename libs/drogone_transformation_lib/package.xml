@@ -19,6 +19,7 @@
 
   <depend>mav_msgs</depend>
   <depend>mav_planning_msgs</depend>
+  <depend>drogone_msgs_rmp</depend>
 
   <depend>roslib</depend>
   <depend>roscpp</depend>

@@ -54,13 +54,21 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     mtx_j(0, 3) = 0;
     mtx_j(1, 3) = 0;
 
-    if(catch_){
+    if(mode_ == "catch"){
       mtx_j(0, 2) = 0;
       mtx_j(1, 2) = 0;
     }
-    else{
+    else if(mode_ == "follow"){
       mtx_j(0, 2) /= 2;
       mtx_j(1, 2) /= 2;
+    }
+    else if(mode_ == "recover"){
+      mtx_j(0, 2) /= 1;
+      mtx_j(1, 2) /= 1;
+    }
+    else if(mode_ == "recover_distance"){
+      mtx_j(0, 2) = 0;
+      mtx_j(1, 2) = 0;
     }
 
     return mtx_j;
@@ -69,7 +77,7 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
   Eigen::Vector3d target_pos_;
   double f_x_, f_y_, u_0_, v_0_, q_x_;
   typename base::VectorQ q_;
-  bool catch_;
+  std::string mode_;
 
  public:
   // position of the target in world frame
@@ -90,12 +98,7 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
   }
 
   void setMode(std::string mode){
-    if(mode == "catch"){
-      catch_ = true;
-    }
-    else{
-      catch_ = false;
-    }
+    mode_ = mode;
   }
 
   virtual void convertToX(const typename base::VectorQ &q, typename base::VectorX *x,

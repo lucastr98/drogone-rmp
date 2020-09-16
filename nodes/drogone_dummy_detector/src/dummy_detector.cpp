@@ -71,7 +71,7 @@ DummyDetector::DummyDetector(ros::NodeHandle nh, ros::NodeHandle nh_private):
 
     uav_state_.velocity << 0.0, 0.0, 0.0;
 
-    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_);
+    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_, nh);
 }
 
 // Callback to get current Pose of UAV
@@ -109,6 +109,17 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   Eigen::Vector3d target_pos_W;
   tf::vectorMsgToEigen(victim_traj.points[0].transforms[0].translation, target_pos_W);
 
+  // check if target position has changed more than 1m since last detection and reset noise param then
+  bool reset_noise;
+  double distance = (target_pos_W - last_target_pos_).norm();
+  if(distance > 1.0){
+    reset_noise = true;
+  }
+  else{
+    reset_noise = false;
+  }
+  last_target_pos_ = target_pos_W;
+
   // check if point is in fov before transforming
   double fov_x = 2 * atan2(w_, 2 * pinhole_constants_.f_x);
   double fov_y = 2 * atan2(h_, 2 * pinhole_constants_.f_y);
@@ -127,7 +138,7 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   uav_pose.translation() = uav_state_.position;
   uav_pose.linear() = uav_state_.orientation.toRotationMatrix();
   transformer_.setMatrices(uav_pose);
-  transformer_.setNoiseParams(d_drone_, tol_u_, tol_v_, tol_d_);
+  transformer_.setNoiseParams(d_drone_, tol_u_, tol_v_, tol_d_, reset_noise);
   Eigen::Matrix<double, 3, 1> detection = transformer_.PosWorld2Image(target_pos_W, noise_).first;
 
   // publish (u, v, d)

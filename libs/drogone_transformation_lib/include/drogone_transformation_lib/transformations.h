@@ -1,4 +1,5 @@
 #include <drogone_transformation_lib/camera_constraints.h>
+#include <drogone_msgs_rmp/noise.h>
 #include <utility>
 #include <random>
 
@@ -7,15 +8,17 @@ namespace drogone_transformation_lib{
 class Transformations{
   public:
     Transformations();
-    void setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting);
+    void setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting, ros::NodeHandle nh);
     void setMatrices(Eigen::Affine3d uav_pose);
     std::pair<Eigen::Matrix<double, 3, 1>, double> PosWorld2Image(Eigen::Vector3d target_W, bool noise);
     Eigen::Matrix<double, 3, 1> VelWorld2Image(Eigen::Vector3d target_pos_W, Eigen::Vector3d uav_vel, double normalization);
     Eigen::Vector3d PosImage2World(Eigen::Matrix<double, 3, 1> detection);
-    void setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d);
+    void setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d, bool reset_noise);
   private:
     PinholeConstants pinhole_constants_;
     CameraMounting camera_mounting_;
+
+    ros::Publisher pub_noise_;
 
     Eigen::Matrix3d R_C_B_;
     Eigen::Matrix3d R_B_W_;

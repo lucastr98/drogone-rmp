@@ -44,6 +44,7 @@ class DummyDetector{
     double h_;
 
     drogone_transformation_lib::Transformations transformer_;
+    Eigen::Vector3d last_target_pos_;
 
     // noise parameters
     bool noise_;

@@ -1,22 +1,28 @@
-evaluation: follow
-target_velocity: two
-flight_path: random
-init_px_err: 400
+evaluation: recover
+target_velocity: four
+flight_path: linear
+init_px_err:
+  # - 200
+  # - 400
+  # - 600
+  # - 200_noise
+  # - 400_noise
+  # - 600_noise
 rosbags:
-  - test0
-  - test1
-  - test2
+  # - test0
+  # - test1
+  # - test2
   - test3
-  - test4
-  - test5
-  - test6
-  - test7
-  - test8
-  - test9
-  - test10
-  - test11
-  - test12
-  - test13
-  - test14
-time_tot: 20.0
-roll_pitch_zero: False
+  # - test4
+  # - test5
+  # - test6
+  # - test7
+  # - test8
+  # - test9
+  # - test10
+  # - test11
+  # - test12
+  # - test13
+  # - test14
+time_tot: 3.0
+roll_pitch_zero: True

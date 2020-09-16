@@ -10,8 +10,8 @@ pitch: 0
 yaw: 0
 translation: [0.0, 0.0, 0.0]
 
-noise: False
+noise: True
 d_drone: 0.4
-tol_u: 2.0
-tol_v: 2.0
-tol_d: 5.0
+tol_u: 3.0
+tol_v: 3.0
+tol_d: 2.0

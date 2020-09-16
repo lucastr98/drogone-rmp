@@ -78,7 +78,7 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
       ROS_ERROR("failed to load a_max");
     }
 
-    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_);
+    transformer_.setCameraConfig(pinhole_constants_, camera_mounting_, nh_);
 
     as_.start();
 }
@@ -165,7 +165,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << 0.0, 0.0, 20.0;
+  take_off_pos << 0.0, 0.0, 70.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -279,15 +279,26 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     // ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
-  else if((mode_ == "catch" || mode_ == "follow") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
-    // ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
+  else if((mode_ == "catch" || mode_ == "follow" || mode_ == "recover_distance") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
+    ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
     mode_ = "recover";
   }
   else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
-    // ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
-  mode_ = "follow";
+  else if(mode_ == "follow" && d > 17.0){
+    ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER DISTANCE");
+    mode_ = "recover_distance";
+  }
+  else if(mode_ == "recover_distance" && d < 10.0){
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    mode_ = "follow";
+  }
+
+  if(mode_ == "catch"){
+    mode_ = "follow";
+  }
 
   if(mode_ == "catch"){
     a_d_ = 3.0;
@@ -298,11 +309,19 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   else if(mode_ == "follow"){
     a_d_ = 1.0;
     d_target_ = 5.0;
+    // d_target_ = 0.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
   else if(mode_ == "recover"){
-    a_d_ = 0.0;
+    a_d_ = 1.0;
+    // a_d_ = 0.0;
+    a_u_ = 5.0;
+    a_v_ = 5.0;
+  }
+  else if(mode_ == "recover_distance"){
+    a_d_ = 1.0;
+    d_target_ = 5.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
@@ -323,14 +342,20 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 2.9;
+  uv_beta_ = 1.8;       // 4m/s
+  // uv_beta_ = 2.9;       // 2m/s
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  d_beta_ = 5.0;
+  d_beta_ = 2.7;        // 4m/s
+  // d_beta_ = 5.0;        // 2m/s
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.2 * d2g_alpha_;
+
+  if(mode_ == "recover"){
+    uv_beta_ = 0.0;
+  }
 
   // plan Trajectory with current weights
   this->planTrajectory();
