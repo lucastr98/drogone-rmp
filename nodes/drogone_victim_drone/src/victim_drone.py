@@ -17,13 +17,15 @@ class VictimDrone(object):
 
     def __init__(self,name):
 
+        # self.linear_counter = 0
+
         #parameters of the trajectory/path, params with ** at the end are changeable parameters (most of them are also changeable in the GUI)
         #--------------------------------------------------------help variables--------------------------------------------------
         self.start_moving = 0
         self.initialize = 1
 
         #--------------------------------------------------------basic variables--------------------------------------------------
-        self.velocity = 4.0 #** #velocity of victim drone
+        self.velocity = 2.0 #** #velocity of victim drone
         self.velocity_fix = self.velocity #for velocity variation
         self.velocity_spread = 0 #0.08 #** #velocity variation. set to zero if no velocity change is wanted
         self.velocity_max = 5 #maximum velocity for varaition
@@ -65,7 +67,7 @@ class VictimDrone(object):
         #parameters of random path, smooth path 0.5 and 0.8, aggressive 1.0 amd 1.5
         self.theta_spread = self.velocity * 1.0 #** #half of the angle interval width in degrees for new angle/ smooth path 0.5, aggressive 1.0
         self.phi_spread = self.velocity * 1.5 #** #half of the angle interval width in degrees for new angle/ smooth path 0.8, aggressive 1.5
-        self.stay_inside = 1 #** #set to zero, if random path should also be continued outside the arena (make sure that theta and phi spread have same value)
+        self.stay_inside = 0 #** #set to zero, if random path should also be continued outside the arena (make sure that theta and phi spread have same value)
         self.smooth = 1 #**  #when drone leaves the frame, should return path be smooth (=1)or more aggressive (=0)
         #if drone should stay inside certain frame (stay inside == 1), default values for rviz arena frame are x=35, y=20, z_max=40, z_min=6
         self.arena_x = 1000 #** # limit in x direction, symmetric so from -arena_x to arena_x (in m)
@@ -257,6 +259,11 @@ class VictimDrone(object):
         return victim_pose
 
     def linear_path(self, current_pose):
+        # self.linear_counter += 1
+        # rospy.logwarn(self.linear_counter)
+        # if(self.linear_counter > 500):
+        #     self.velocity = 4
+
         #distance covered in certain time interval
         ds = self.velocity * self.dt
 
@@ -372,7 +379,18 @@ class VictimDrone(object):
         # transfer victim velocity vector from kartesian x,y,z into spherical coordinates r, phi, theta
         r = np.sqrt(twist.linear.x*twist.linear.x + twist.linear.y*twist.linear.y + twist.linear.z*twist.linear.z)
         # if velocity == 0 take the motion vector as startign vector
-        if r == 0:
+        # if r == 0:
+        #     twist.linear.x = self.motion_vector.x
+        #     twist.linear.y = self.motion_vector.y
+        #     twist.linear.z = self.motion_vector.z
+        #     # r = 1 # as motion vector is of magnitude 1
+        #     theta_old = math.acos(twist.linear.z/1)
+        #     phi_old = math.atan2(twist.linear.y, twist.linear.x)
+        #     rospy.logwarn(theta_old)
+        # else:
+        #     theta_old = math.acos(twist.linear.z/r)
+        #     phi_old = math.atan2(twist.linear.y, twist.linear.x)
+        if self.reset == True:
             twist.linear.x = self.motion_vector.x
             twist.linear.y = self.motion_vector.y
             twist.linear.z = self.motion_vector.z
@@ -380,11 +398,22 @@ class VictimDrone(object):
         theta_old = math.acos(twist.linear.z/r)
         phi_old = math.atan2(twist.linear.y, twist.linear.x)
 
-
         #calculate new angles with randomly picked angle difference
         if self.outside_arena == 0 and self.above_arena == 0 and self.below_arena == 0:
-            theta_new = np.random.uniform(-self.theta_spread, self.theta_spread) * np.pi/180 + theta_old
-            phi_new = np.random.uniform(- self.phi_spread, self.phi_spread) * np.pi/180 + phi_old
+            # if r == 0:
+            #     theta_new = theta_old
+            #     phi_new = phi_old
+            #     r = 1
+            # else:
+            #     theta_new = np.random.uniform(-self.theta_spread, self.theta_spread) * np.pi/180 + theta_old
+            #     phi_new = np.random.uniform(- self.phi_spread, self.phi_spread) * np.pi/180 + phi_old
+            if self.reset == True:
+                theta_new = theta_old
+                phi_new = phi_old
+                self.reset = False
+            else:
+                theta_new = np.random.uniform(-self.theta_spread, self.theta_spread) * np.pi/180 + theta_old
+                phi_new = np.random.uniform(- self.phi_spread, self.phi_spread) * np.pi/180 + phi_old
 
         #If drone moved out of the frame, changes the spread of the angle such that the drone moves back into the frame
         #below limit
@@ -533,7 +562,7 @@ class VictimDrone(object):
         #velocity
         if not data.data[1] == 0.0:
             # self.velocity = data.data[1]
-            self.velocity = 4
+            self.velocity = 2
 
         #angle spread
         if not data.data[16] == 0.0:
@@ -552,27 +581,29 @@ class VictimDrone(object):
             self.delete_traj = 1
 
             # for evaluation
-            self.phi_eval = 0
+            self.phi_eval = np.pi / 4 * 5
             self.theta_eval = np.pi / 2
-            self.z_C_eval = 7
+            self.z_C_eval = 15
+            init_px_eval = 200
             # self.phi_eval = np.random.uniform(0, 2 * np.pi)
             # self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
             # self.z_C_eval = np.random.uniform(5, 15)
-            init_px_eval = 400
+            # init_px_eval = np.random.uniform(200, 600)
             u_eval = np.cos(self.phi_eval) * init_px_eval
             v_eval = np.sin(self.phi_eval) * init_px_eval
             x_C_eval = u_eval / 1140 * self.z_C_eval
             y_C_eval = v_eval / 1140 * self.z_C_eval
-            self.starting_point.x = x_C_eval
-            self.starting_point.y = y_C_eval
-            self.starting_point.z = self.z_C_eval + 70.0
+            self.starting_point.x = x_C_eval - 40.0
+            self.starting_point.y = y_C_eval - 150.0
+            self.starting_point.z = self.z_C_eval + 35.0
+            self.reset = True
 
         # vector of linear moving victim drone parameters
         elif data.data[6] == 1.0:
             direction_x_eval = np.sin(self.theta_eval) * np.cos(self.phi_eval)
             direction_y_eval = np.sin(self.theta_eval) * np.sin(self.phi_eval)
             direction_z_eval = np.cos(self.theta_eval)
-            magnitude = np.sqrt(direction_x_eval*direction_x_eval + direction_y_eval*direction_y_eval + direction_z_eval*direction_z_eval)
+            magnitude = np.sqrt(direction_x_eval**2 + direction_y_eval**2 + direction_z_eval**2)
             self.motion_vector.x = direction_x_eval / magnitude
             self.motion_vector.y = direction_y_eval / magnitude
             self.motion_vector.z = direction_z_eval / magnitude

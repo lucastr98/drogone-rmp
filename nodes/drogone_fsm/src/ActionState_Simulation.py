@@ -151,8 +151,10 @@ def main():
         smach.StateMachine.add('Follow', sm_Follow,
                                 # transitions={'Lost':'WaitforAutonomous',
                                 transitions={'Lost':'StartManual',
-                                             'Followed':'Land',
-                                             'Caught':'Land',
+                                             'Followed':'WaitforInstruction',
+                                             'Caught':'WaitforInstruction',
+                                             # 'Followed':'Land',
+                                             # 'Caught':'Land',
                                              })
 
 

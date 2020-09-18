@@ -23,6 +23,7 @@
 #include <drogone_transformation_lib/transformations.h>
 #include <drogone_msgs_rmp/AccFieldWithState.h>
 #include <geometry_msgs/PoseArray.h>
+#include <geometry_msgs/PointStamped.h>
 
 namespace drogone_rmp_planner {
 
@@ -47,6 +48,7 @@ class RMPPlanner{
     RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_private);
 
     void uavOdomCallback(const nav_msgs::Odometry::ConstPtr& pose);
+    void AltitudeCallback(const geometry_msgs::PointStamped::ConstPtr& pose);
     void uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory::ConstPtr& traj);
     void server_callback(const drogone_action_rmp::FSMGoalConstPtr& goal);
 
@@ -82,6 +84,7 @@ class RMPPlanner{
     ros::Publisher pub_analyzation_policy_;
     ros::Publisher new_temporary_pub_;
     ros::Subscriber sub_odom_;
+    ros::Subscriber sub_altitude_;
     ros::Subscriber sub_traj_;
     ros::Subscriber sub_follow_;
 
@@ -93,6 +96,7 @@ class RMPPlanner{
     UAVState physical_uav_state_;
     UAVState trajectory_uav_state_;
     UAVState planning_uav_state_;
+    double distance2ground_;
     bool first_odom_cb_;
     double old_stamp_;
     ros::Time time_of_last_detection_;

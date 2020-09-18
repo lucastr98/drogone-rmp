@@ -241,8 +241,12 @@ if(evaluation == 'follow'):
         c = next(color)
         axes[0].plot(time, px_mean_complete[i], c=c)
         axes[0].fill_between(time, px_mean_minus_stddev_complete[i], px_mean_plus_stddev_complete[i], alpha=0.5, color=c)
+        axes[0].set_xlabel("time [s]")
+        axes[0].set_ylabel("pixel error [px]")
         axes[1].plot(time, xy_mean_complete[i], c=c)
         axes[1].fill_between(time, xy_mean_minus_stddev_complete[i], xy_mean_plus_stddev_complete[i], alpha=0.5, color=c)
+        axes[1].set_xlabel("time [s]")
+        axes[1].set_ylabel("pixel error [px]")
     axes[0].grid()
     axes[1].grid()
 
@@ -378,7 +382,7 @@ elif(evaluation == 'recover'):
         v.append(u_v[1] / u_v[2])
 
     time1 = np.linspace(0, sw2rec - 0.01, sw2rec * 100)
-    time2 = np.linspace(sw2rec, sw2foll - 0.01, (sw2foll - sw2rec) * 100)
+    time2 = np.linspace(sw2rec, sw2foll - 0.01, (sw2foll - sw2rec) * 100 + 1)
     time3 = np.linspace(sw2foll, time_tot - 0.01, (time_tot - sw2foll) * 100)
     u1 = u[0 : int(sw2rec*100)]
     u2 = u[int(sw2rec*100) : int(sw2foll*100)]

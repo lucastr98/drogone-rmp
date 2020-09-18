@@ -24,6 +24,10 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     sub_odom_ =
         nh_.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
 
+    // subscriber to Altitude
+    sub_altitude_ =
+        nh_.subscribe("/altitude_node/intersection", 1, &RMPPlanner::AltitudeCallback, this);
+
     // subscriber to Trajectory for trajectory uav state
     sub_traj_ =
         nh_.subscribe("command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
@@ -131,6 +135,11 @@ void RMPPlanner::uavOdomCallback(const nav_msgs::Odometry::ConstPtr& odom) {
   old_stamp_ = odom->header.stamp.sec + odom->header.stamp.nsec/1e9;
 }
 
+void RMPPlanner::AltitudeCallback(const geometry_msgs::PointStamped::ConstPtr& altitude){
+  distance2ground_ = altitude->point.z;
+}
+
+
 void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory::ConstPtr& traj){
   int point_num = 1 / frequency_ / sampling_interval_ - 1;
   Eigen::Vector3d position;
@@ -165,7 +174,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << 0.0, 0.0, 70.0;
+  take_off_pos << -40.0, -150.0, 35.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -216,18 +225,19 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
     mode_ = "follow";
+    d_target_ = 15.0;
     planning_uav_state_ = physical_uav_state_;
   }
   else{
     planning_uav_state_ = trajectory_uav_state_;
   }
 
-  // for evaluation stop following after a certain amount of seconds
-  ros::Time current_time = ros::Time::now();
-  if((current_time - follow_starting_time_).toSec() > 21.0){
-    ROS_WARN_STREAM("FINISHED");
-    return;
-  }
+  // // for evaluation stop following after a certain amount of seconds
+  // ros::Time current_time = ros::Time::now();
+  // if((current_time - follow_starting_time_).toSec() > 21.0){
+  //   ROS_WARN_STREAM("FINISHED");
+  //   return;
+  // }
 
   // set target_passed_ false again if the target is passed the replanning stops anyway
   target_passed_ = false;
@@ -275,7 +285,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   double v = abs(image_pair.first[1]);
   double d = abs(image_pair.first[2]);
 
-  if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0))){
+  if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0)) && d_target_ > 4.5 && d_target_ < 5.5){
     // ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
@@ -295,27 +305,33 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
+  else if(mode_ != "prevent_ground_crash" && distance2ground_ < 3){
+    ROS_WARN_STREAM("MP ----- SWITCHED TO PREVENT GROUND CRASH");
+    mode_ = "prevent_ground_crash";
+  }
+  else if(mode_ == "prevent_ground_crash" && distance2ground_ > 4.0){
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+    mode_ = "follow";
+  }
 
   if(mode_ == "catch"){
     mode_ = "follow";
   }
 
   if(mode_ == "catch"){
-    a_d_ = 3.0;
+    a_d_ = 4.0;
     d_target_ = 0.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
-    d_target_ = 5.0;
-    // d_target_ = 0.0;
+    // d_target_ = 5.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
   else if(mode_ == "recover"){
     a_d_ = 1.0;
-    // a_d_ = 0.0;
     a_u_ = 5.0;
     a_v_ = 5.0;
   }
@@ -325,8 +341,14 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_u_ = 1.0;
     a_v_ = 1.0;
   }
+  else if(mode_ == "prevent_ground_crash"){
+    a_d2g_ = 1;
+    a_u_ = 0;
+    a_v_ = 0;
+    d_target_ = 5.0;
+  }
 
-  if(planning_uav_state_.pose.translation()[2] < 2){
+  if(distance2ground_ < 2){
     a_d2g_ = 100;
   }
   else{
@@ -342,18 +364,24 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  uv_beta_ = 1.8;       // 4m/s
-  // uv_beta_ = 2.9;       // 2m/s
+  // uv_beta_ = 5.0;       // 0m/s
+  uv_beta_ = 2.9;       // 2m/s
+  // uv_beta_ = 1.8;       // 4m/s
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  d_beta_ = 2.7;        // 4m/s
-  // d_beta_ = 5.0;        // 2m/s
+  // d_beta_ = 5.0;        // 0m/s
+  d_beta_ = 5.0;        // 2m/s
+  // d_beta_ = 2.7;        // 4m/s
   d_c_ = 0.5;
   d2g_alpha_ = 3;
-  d2g_beta_ = 0.2 * d2g_alpha_;
+  d2g_beta_ = 1;
 
   if(mode_ == "recover"){
+    uv_beta_ = 0.0;
+  }
+  if(mode_ == "catch" && d < 2.0 && u > 150){
+    ROS_WARN_STREAM("MP ----- DISABLED UV DAMPER TO CATCH");
     uv_beta_ = 0.0;
   }
 
@@ -489,7 +517,7 @@ void RMPPlanner::planTrajectory(){
     }
 
     // calculate distance 2 ground
-    d2g[0] = planning_uav_state_.pose.translation()[2] - 0;
+    d2g[0] = distance2ground_;
     d2g_dot[0] = planning_uav_state_.velocity[2];
 
     // get u, v, d and normalization constant for velocity from transformer which was updated above with the pose currently looked at
@@ -542,7 +570,7 @@ void RMPPlanner::planTrajectory(){
     // if the target is passed change the distance policy
     Eigen::Vector3d uav_pos;
     uav_pos << traj_pos[0], traj_pos[1], traj_pos[2];
-    if(cur_target_pos_[2] - uav_pos[2] < 0 && !target_passed_){
+    if(cur_target_pos_[2] - uav_pos[2] < 0.3 && !target_passed_){
       target_passed_ = true;
     }
 
