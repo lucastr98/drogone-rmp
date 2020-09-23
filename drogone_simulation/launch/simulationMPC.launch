@@ -5,7 +5,7 @@
   <arg name="enable_ground_truth" default="true" />
   <arg name="log_file" default="$(arg mav_name)" />
   <arg name="debug" default="false"/>
-  <arg name="gui" default="true"/>
+  <arg name="gui" default="false"/>
   <arg name="paused" default="false"/>
   <!-- The following line causes gzmsg and gzerr messages to be printed to the console
       (even when Gazebo is started through roslaunch) -->
@@ -26,6 +26,7 @@
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
       <arg name="world_name" value="$(find huenli_world)/worlds/$(arg world_name).world" />
       <arg name="paused" value="$(arg paused)" />
+      <arg name="gui" value="$(arg gui)" />
   </include>
 
   <group ns="$(arg mav_name)">
@@ -37,10 +38,12 @@
           <arg name="enable_logging" value="$(arg enable_logging)" />
           <arg name="enable_ground_truth" value="$(arg enable_ground_truth)" />
           <arg name="log_file" value="$(arg log_file)"/>
+          <!-- <arg name="x" value="0"/>
+          <arg name="y" value="0"/>
+          <arg name="z" value="0.3"/> -->
           <arg name="x" value="-40"/>
           <arg name="y" value="-150"/>
           <arg name="z" value="25"/>
-          <!-- <arg name="z" value="0.3"/> -->
       </include>
 
       <!-- launch non linear MPC Controller -->
@@ -89,6 +92,12 @@
   <node name="altitude_node" pkg="cpt_utils" type="altitude_node">
     <param name="mesh_path" value="$(find huenli_world)/models/huenliwald_mesh/meshes/huenliwald.off" />
     <remap from="/altitude_node/odometry" to="$(arg mav_name)/odometry_sensor1/odometry"/>
+  </node>
+
+  <node name="mesh_publisher" pkg="cpt_utils" type="mesh_publisher_node" output="screen">
+      <param name="publish_on_start" value="true"/>
+      <param name="default_filename" value="$(find huenli_world)/models/huenliwald_mesh/meshes/huenliwald.off"/>
+      <param name="frame_name" value="world"/>
   </node>
 
 

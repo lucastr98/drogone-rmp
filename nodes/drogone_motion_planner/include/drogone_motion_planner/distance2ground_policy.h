@@ -53,6 +53,7 @@ class Distance2GroundPolicy : public PolicyBase<n> {
     if(this->f_[0] > max_acc_){
       this->f_[0] = max_acc_;
     }
+    // std::cout << this->f_ << std::endl;
   }
 
   void setMaxAcc(double max_acc){

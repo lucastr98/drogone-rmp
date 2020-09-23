@@ -174,7 +174,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << -40.0, -150.0, 35.0;
+  take_off_pos << -40.0, -150.0, 30.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -225,7 +225,8 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
     mode_ = "follow";
-    d_target_ = 15.0;
+    uv_beta_ = 2.9;
+    d_target_ = 5.0;
     planning_uav_state_ = physical_uav_state_;
   }
   else{
@@ -305,12 +306,14 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
-  else if(mode_ != "prevent_ground_crash" && distance2ground_ < 3){
+
+  if(mode_ != "prevent_ground_crash" && distance2ground_ < 2.0){
     ROS_WARN_STREAM("MP ----- SWITCHED TO PREVENT GROUND CRASH");
     mode_ = "prevent_ground_crash";
   }
-  else if(mode_ == "prevent_ground_crash" && distance2ground_ > 4.0){
-    ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
+  else if(mode_ == "prevent_ground_crash" && distance2ground_ > 2.2){
+    ROS_WARN_STREAM("MP ----- SWITCHED BACK");
+    d_target_ = d;
     mode_ = "follow";
   }
 
@@ -329,9 +332,13 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     // d_target_ = 5.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
+    if(uv_beta_ != 2.9){
+      uv_beta_ += 0.29;
+    }
   }
   else if(mode_ == "recover"){
     a_d_ = 1.0;
+    d_target_ = 5.0;
     a_u_ = 5.0;
     a_v_ = 5.0;
   }
@@ -345,14 +352,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_d2g_ = 1;
     a_u_ = 0;
     a_v_ = 0;
-    d_target_ = 5.0;
-  }
-
-  if(distance2ground_ < 2){
-    a_d2g_ = 100;
-  }
-  else{
-    a_d2g_ = 0;
+    a_d_ = 0;
   }
 
   if(first_detection_){
@@ -365,7 +365,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   /* SET THE POLICY VARIABLES */
   // uv_beta_ = 5.0;       // 0m/s
-  uv_beta_ = 2.9;       // 2m/s
+  // uv_beta_ = 2.9;       // 2m/s
   // uv_beta_ = 1.8;       // 4m/s
   u_target_ = 0.0;
   v_target_ = 0.0;
@@ -375,12 +375,12 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // d_beta_ = 2.7;        // 4m/s
   d_c_ = 0.5;
   d2g_alpha_ = 3;
-  d2g_beta_ = 1;
+  d2g_beta_ = 0.5;
 
   if(mode_ == "recover"){
     uv_beta_ = 0.0;
   }
-  if(mode_ == "catch" && d < 2.0 && u > 150){
+  if(mode_ == "catch" && d < 2.0 /*&& u > 100*/){
     ROS_WARN_STREAM("MP ----- DISABLED UV DAMPER TO CATCH");
     uv_beta_ = 0.0;
   }

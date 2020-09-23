@@ -1,6 +1,10 @@
-evaluation: follow
-target_velocity: two
+evaluation: recover
+target_velocity: four
 flight_path: linear
+success:
+  - 15
+  - 19
+  - 21
 init_px_err:
   # - 200
   # - 400
@@ -9,20 +13,20 @@ init_px_err:
   - 400_noise
   - 600_noise
 rosbags:
-  - test0
-  - test1
-  - test2
-  - test3
-  - test4
-  - test5
-  - test6
-  - test7
-  - test8
+  # - test0
+  # - test1
+  # - test2
+  # - test3
+  # - test4
+  # - test5
+  # - test6
+  # - test7
+  # - test8
   - test9
-  - test10
-  - test11
-  - test12
-  - test13
-  - test14
-time_tot: 20.0
+  # - test10
+  # - test11
+  # - test12
+  # - test13
+  # - test14
+time_tot: 13.5
 roll_pitch_zero: False

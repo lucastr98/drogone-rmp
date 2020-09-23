@@ -63,8 +63,8 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
       mtx_j(1, 2) /= 2;
     }
     else if(mode_ == "recover"){
-      mtx_j(0, 2) /= 1;
-      mtx_j(1, 2) /= 1;
+      mtx_j(0, 2) *= 2;
+      mtx_j(1, 2) *= 2;
     }
     else if(mode_ == "recover_distance"){
       mtx_j(0, 2) = 0;

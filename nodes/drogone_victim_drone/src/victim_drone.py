@@ -261,8 +261,18 @@ class VictimDrone(object):
     def linear_path(self, current_pose):
         # self.linear_counter += 1
         # rospy.logwarn(self.linear_counter)
-        # if(self.linear_counter > 500):
+        # if(self.linear_counter > 600):
         #     self.velocity = 4
+
+        # self.linear_counter += 1
+        # if self.linear_counter > 1200:
+        #     theta_old = math.acos(self.motion_vector.z/1)
+        #     phi = math.atan2(self.motion_vector.y, self.motion_vector.x)
+        #     if theta_old > np.pi / 2:
+        #         theta_new = theta_old - np.pi / 400
+        #         self.motion_vector.x =  math.sin(theta_new) * math.cos(phi)
+        #         self.motion_vector.y =  math.sin(theta_new) * math.sin(phi)
+        #         self.motion_vector.z =  math.cos(theta_new)
 
         #distance covered in certain time interval
         ds = self.velocity * self.dt
@@ -583,7 +593,7 @@ class VictimDrone(object):
             # for evaluation
             self.phi_eval = np.pi / 4 * 5
             self.theta_eval = np.pi / 2
-            self.z_C_eval = 15
+            self.z_C_eval = 10
             init_px_eval = 200
             # self.phi_eval = np.random.uniform(0, 2 * np.pi)
             # self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
@@ -595,7 +605,7 @@ class VictimDrone(object):
             y_C_eval = v_eval / 1140 * self.z_C_eval
             self.starting_point.x = x_C_eval - 40.0
             self.starting_point.y = y_C_eval - 150.0
-            self.starting_point.z = self.z_C_eval + 35.0
+            self.starting_point.z = self.z_C_eval + 30.0
             self.reset = True
 
         # vector of linear moving victim drone parameters
