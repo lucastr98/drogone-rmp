@@ -1,19 +1,19 @@
-evaluation: recover
-target_velocity: four
-flight_path: linear
+evaluation: follow_distances
+target_velocity: two
+flight_path: random
 success:
   - 15
-  - 19
-  - 21
+  - 15
+  - 15
 init_px_err:
   # - 200
   # - 400
   # - 600
-  - 200_noise
+  # - 200_noise
   - 400_noise
-  - 600_noise
+  # - 600_noise
 rosbags:
-  # - test0
+  - test0
   # - test1
   # - test2
   # - test3
@@ -22,11 +22,18 @@ rosbags:
   # - test6
   # - test7
   # - test8
-  - test9
+  # - test9
   # - test10
   # - test11
   # - test12
   # - test13
   # - test14
-time_tot: 13.5
+  # - new_test0
+catch_success:
+  - 15
+  - 14
+  - 10
+  - 12
+  - 2
+time_tot: 20.0
 roll_pitch_zero: False

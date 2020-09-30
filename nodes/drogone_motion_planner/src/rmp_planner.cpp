@@ -174,7 +174,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << -40.0, -150.0, 30.0;
+  take_off_pos << 0.0, 0.0, 30.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -225,7 +225,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   // store the correct uav state in planning_uav_state_
   if(first_detection_){
     mode_ = "follow";
-    uv_beta_ = 2.9;
     d_target_ = 5.0;
     planning_uav_state_ = physical_uav_state_;
   }
@@ -287,22 +286,26 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   double d = abs(image_pair.first[2]);
 
   if(mode_ == "follow" && (u < 1.0 / 5.0 * (image_width_px_ / 2.0) && v < 1.0 / 5.0 * (image_height_px_ / 2.0)) && d_target_ > 4.5 && d_target_ < 5.5){
-    // ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
+    ROS_WARN_STREAM("MP ----- SWITCHED TO CATCH");
     mode_ = "catch";
   }
   else if((mode_ == "catch" || mode_ == "follow" || mode_ == "recover_distance") && (u > 4.0 / 5.0 * (image_width_px_ / 2.0) || v > 4.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER");
     mode_ = "recover";
+    if(mode_ == "catch" && d < 1.5){
+      mode_ = "catch";
+    }
   }
   else if(mode_ == "recover" && (u < 3.0 / 5.0 * (image_width_px_ / 2.0) && v < 3.0 / 5.0 * (image_height_px_ / 2.0))){
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
-  else if(mode_ == "follow" && d > 17.0){
+
+  if(mode_ == "follow" && d > 17.0){
     ROS_WARN_STREAM("MP ----- TARGET ALMOST LOST, SWITCHED TO RECOVER DISTANCE");
     mode_ = "recover_distance";
   }
-  else if(mode_ == "recover_distance" && d < 10.0){
+  else if(mode_ == "recover_distance" && d < 12.0){
     ROS_WARN_STREAM("MP ----- SWITCHED BACK TO FOLLOW");
     mode_ = "follow";
   }
@@ -317,9 +320,9 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     mode_ = "follow";
   }
 
-  if(mode_ == "catch"){
-    mode_ = "follow";
-  }
+  // if(mode_ == "catch"){
+  //   mode_ = "follow";
+  // }
 
   if(mode_ == "catch"){
     a_d_ = 4.0;
@@ -329,12 +332,8 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
   else if(mode_ == "follow"){
     a_d_ = 1.0;
-    // d_target_ = 5.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
-    if(uv_beta_ != 2.9){
-      uv_beta_ += 0.29;
-    }
   }
   else if(mode_ == "recover"){
     a_d_ = 1.0;
@@ -343,7 +342,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     a_v_ = 5.0;
   }
   else if(mode_ == "recover_distance"){
-    a_d_ = 1.0;
+    a_d_ = 2.0;
     d_target_ = 5.0;
     a_u_ = 1.0;
     a_v_ = 1.0;
@@ -365,7 +364,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 
   /* SET THE POLICY VARIABLES */
   // uv_beta_ = 5.0;       // 0m/s
-  // uv_beta_ = 2.9;       // 2m/s
+  uv_beta_ = 2.9;       // 2m/s
   // uv_beta_ = 1.8;       // 4m/s
   u_target_ = 0.0;
   v_target_ = 0.0;
@@ -380,7 +379,11 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   if(mode_ == "recover"){
     uv_beta_ = 0.0;
   }
-  if(mode_ == "catch" && d < 2.0 /*&& u > 100*/){
+  if(mode_ == "recover_distance"){
+    d_beta_ = 1.0;
+  }
+  if(mode_ == "catch" && d < 2.0 && d > 0.8){
+  // if(mode_ == "catch" && d < 3.0 && d > 0.8){
     ROS_WARN_STREAM("MP ----- DISABLED UV DAMPER TO CATCH");
     uv_beta_ = 0.0;
   }
@@ -390,7 +393,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 }
 
 void RMPPlanner::planTrajectory(){
-  chrono_t1_ = std::chrono::high_resolution_clock::now();
+  // chrono_t1_ = std::chrono::high_resolution_clock::now();
 
   // define geometries
   using camera_geometry = rmpcpp::CartesianCameraGeometry;
@@ -585,8 +588,8 @@ void RMPPlanner::planTrajectory(){
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
 
-  chrono_t2_ = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
+  // chrono_t2_ = std::chrono::high_resolution_clock::now();
+  // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
   // std::cout << "Duration: " << duration << " microseconds" << std::endl;
 }
 

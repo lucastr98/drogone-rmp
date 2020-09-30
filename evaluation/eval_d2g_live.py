@@ -51,7 +51,7 @@ len_2 = len(time_1) + len(time_2)
 len_3 = len(time_1) + len(time_2) + len(time_3)
 def animate(i):
     if(i < len_1):
-        ax.plot(time_1[i], altitude_1[i], '.', c='b')
+        ax.plot(time_1[i], altitude_1[i], '.', c='r')
         if(len(str(i)) == 1):
             fig.savefig('plot-000' + str(i) + '.png')
         elif(len(str(i)) == 2):
@@ -61,7 +61,7 @@ def animate(i):
         elif(len(str(i)) == 4):
             fig.savefig('plot-' + str(i) + '.png')
     elif(i >= len_1 and i < len_2):
-        ax.plot(time_2[i - len_1], altitude_2[i - len_1], '.', c='r')
+        ax.plot(time_2[i - len_1], altitude_2[i - len_1], '.', c='orange')
         if(len(str(i)) == 1):
             fig.savefig('plot-000' + str(i) + '.png')
         elif(len(str(i)) == 2):
@@ -71,7 +71,7 @@ def animate(i):
         elif(len(str(i)) == 4):
             fig.savefig('plot-' + str(i) + '.png')
     elif(i >= len_2 and i < len_3):
-        ax.plot(time_3[i - len_2], altitude_3[i - len_2], '.', c='b')
+        ax.plot(time_3[i - len_2], altitude_3[i - len_2], '.', c='r')
         if(len(str(i)) == 1):
             fig.savefig('plot-000' + str(i) + '.png')
         elif(len(str(i)) == 2):

@@ -96,8 +96,6 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     double s_y_C = abs(target_C[2] * tol_v_ / pinhole_constants_.f_y);
     double s_z_C = abs(d_drone_ * pinhole_constants_.f_x * abs(1 / (tol_d_ + pinhole_constants_.f_x * (d_drone_ / target_C[2])) - 1 / (pinhole_constants_.f_x * d_drone_ / target_C[2])));
 
-    // std::cout << "stddev -> x: " << s_x_C << ", y: " << s_y_C << ", z: " << s_z_C << std::endl;
-
     rand_noise_x_C_ = std::normal_distribution<double>(0.0, s_x_C / 10);
     rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C / 10);
     rand_noise_z_C_ = std::normal_distribution<double>(0.0, s_z_C / 10);
@@ -108,10 +106,6 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     noise_gen_x_ += noise_x_adder;
     noise_gen_y_ += noise_y_adder;
     noise_gen_z_ += noise_z_adder;
-
-    // std::cout << "noisy pos -> x: " << target_C[0] + noise_gen_x_ << " y: " << target_C[1] + noise_gen_y_ << " z: " << target_C[2] + noise_gen_z_ << std::endl;
-    // std::cout << "noisy error -> x: " << noise_gen_x_ << ", y: " << noise_gen_y_ << ", z: " << noise_gen_z_ << std::endl;
-    // std::cout << " " << std::endl;
 
     drogone_msgs_rmp::noise noise_msg;
     noise_msg.x_C = target_C[0];

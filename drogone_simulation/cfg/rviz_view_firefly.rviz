@@ -9,9 +9,11 @@ Panels:
         - /TF1/Tree1
         - /Victim Drone Path1
         - /DroGone Path1
+        - /Victim Drone Position1
         - /TriangleMeshDisplay1
+        - /Grid1
       Splitter Ratio: 0.6143187284469604
-    Tree Height: 687
+    Tree Height: 303
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -173,12 +175,12 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 52; 101; 164
+      Color: 25; 255; 0
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
-      Line Style: Billboards
+      Line Style: Lines
       Line Width: 0.20000000298023224
       Name: Victim Drone Path
       Offset:
@@ -272,7 +274,7 @@ Visualization Manager:
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
-      Line Style: Billboards
+      Line Style: Lines
       Line Width: 0.20000000298023224
       Name: DroGone Path
       Offset:
@@ -289,7 +291,7 @@ Visualization Manager:
       Value: true
     - Alpha: 1
       Class: rviz/PointStamped
-      Color: 52; 101; 164
+      Color: 25; 255; 0
       Enabled: true
       History Length: 1
       Name: Victim Drone Position
@@ -309,11 +311,29 @@ Visualization Manager:
       Backface Culling: false
       Class: cgal_visualizations/TriangleMeshDisplay
       Edge Color: 0; 80; 0
-      Enabled: true
+      Enabled: false
       Name: TriangleMeshDisplay
       Surface Color: 0; 153; 0
       Topic: /mesh_publisher/mesh_out
       Unreliable: false
+      Value: false
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 85; 87; 83
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 1000
+      Reference Frame: <Fixed Frame>
       Value: true
   Enabled: true
   Global Options:
@@ -343,25 +363,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 176.11187744140625
+      Distance: 9.129091262817383
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -163.35867309570312
-        Y: -155.0391845703125
-        Z: -5.9743452072143555
+        X: 1.3959193229675293
+        Y: -17.918209075927734
+        Z: 30.4395809173584
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.34539860486984253
+      Pitch: -0.07960143685340881
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 6.175405502319336
+      Yaw: 4.58540153503418
     Saved: ~
 Window Geometry:
   Displays:

@@ -265,14 +265,14 @@ class VictimDrone(object):
         #     self.velocity = 4
 
         # self.linear_counter += 1
-        # if self.linear_counter > 1200:
+        # if self.linear_counter > 1200 and self.linear_counter < 1300:
         #     theta_old = math.acos(self.motion_vector.z/1)
-        #     phi = math.atan2(self.motion_vector.y, self.motion_vector.x)
-        #     if theta_old > np.pi / 2:
-        #         theta_new = theta_old - np.pi / 400
-        #         self.motion_vector.x =  math.sin(theta_new) * math.cos(phi)
-        #         self.motion_vector.y =  math.sin(theta_new) * math.sin(phi)
-        #         self.motion_vector.z =  math.cos(theta_new)
+        #     phi_old = math.atan2(self.motion_vector.y, self.motion_vector.x)
+        #     theta_new = theta_old + np.pi / 600
+        #     phi_new = phi_old + np.pi / 400
+        #     self.motion_vector.x =  math.sin(theta_new) * math.cos(phi_new)
+        #     self.motion_vector.y =  math.sin(theta_new) * math.sin(phi_new)
+        #     self.motion_vector.z =  math.cos(theta_new)
 
         #distance covered in certain time interval
         ds = self.velocity * self.dt
@@ -591,10 +591,10 @@ class VictimDrone(object):
             self.delete_traj = 1
 
             # for evaluation
-            self.phi_eval = np.pi / 4 * 5
+            self.phi_eval = 0
             self.theta_eval = np.pi / 2
-            self.z_C_eval = 10
-            init_px_eval = 200
+            self.z_C_eval = 13
+            init_px_eval = 400
             # self.phi_eval = np.random.uniform(0, 2 * np.pi)
             # self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
             # self.z_C_eval = np.random.uniform(5, 15)
@@ -603,8 +603,8 @@ class VictimDrone(object):
             v_eval = np.sin(self.phi_eval) * init_px_eval
             x_C_eval = u_eval / 1140 * self.z_C_eval
             y_C_eval = v_eval / 1140 * self.z_C_eval
-            self.starting_point.x = x_C_eval - 40.0
-            self.starting_point.y = y_C_eval - 150.0
+            self.starting_point.x = x_C_eval
+            self.starting_point.y = y_C_eval
             self.starting_point.z = self.z_C_eval + 30.0
             self.reset = True
 
