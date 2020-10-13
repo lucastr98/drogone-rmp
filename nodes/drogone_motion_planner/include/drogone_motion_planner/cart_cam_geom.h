@@ -9,11 +9,8 @@
 namespace rmpcpp {
 
 /**
- * Example of a cylindrical geometry that maps to a plane.
- * Here, the task space is the unit sphere, and the configuration space is R^3
- *
- * X Task space coordinates are: theta, rho, z
- * Q Configuration space coordinates are: x,y,z
+ * X Task space coordinates are: u, v
+ * Q Configuration space coordinates are: x,y,z,yaw
  */
 class CartesianCameraGeometry : public GeometryBase<2, 4> {
   // type alias for readability.
@@ -35,7 +32,7 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     mtx_j(0, 2) = -u_0_ / (target_pos_[2] - q_[2]) +
                   1 / (target_pos_[2] - q_[2]) / (target_pos_[2] - q_[2]) *
                   (f_x_ * (cos(q_[3]) * (target_pos_[0] - q_[0]) + sin(q_[3]) *
-                  (target_pos_[1] - q_[1])) + u_0_ * (target_pos_[2] - q_[2])); // --> returned nan
+                  (target_pos_[1] - q_[1])) + u_0_ * (target_pos_[2] - q_[2]));
     mtx_j(0, 3) = f_x_ / (target_pos_[2] - q_[2]) * (sin(q_[3]) * (q_[0] - target_pos_[0]) -
                                                      cos(q_[3]) * (q_[1] - target_pos_[1]));
     mtx_j(1, 0) = f_y_ * sin(q_[3]) / (target_pos_[2] - q_[2]);
@@ -43,13 +40,9 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     mtx_j(1, 2) = -v_0_ / (target_pos_[2] - q_[2]) +
                   1 / (target_pos_[2] - q_[2]) / (target_pos_[2] - q_[2]) *
                   (f_y_ * (-sin(q_[3]) * (target_pos_[0] - q_[0]) + cos(q_[3]) *
-                  (target_pos_[1] - q_[1])) + v_0_ * (target_pos_[2] - q_[2])); // --> returned nan
+                  (target_pos_[1] - q_[1])) + v_0_ * (target_pos_[2] - q_[2]));
     mtx_j(1, 3) = f_y_ / (target_pos_[2] - q_[2]) * (cos(q_[3]) * (q_[0] - target_pos_[0]) +
                                                      sin(q_[3]) * (q_[1] - target_pos_[1]));
-
-
-    // std::cout << "Jacobian (camera): " << mtx_j(0, 0) << ", " << mtx_j(0, 1) << ", " << mtx_j(0, 2) << ", " << mtx_j(0, 3) << ", "
-    // << mtx_j(1, 0) << ", " << mtx_j(1, 1) << ", " << mtx_j(1, 2) << ", " << mtx_j(1, 3) << std::endl;
 
     mtx_j(0, 3) = 0;
     mtx_j(1, 3) = 0;
@@ -110,15 +103,12 @@ class CartesianCameraGeometry : public GeometryBase<2, 4> {
     ACK_UNUSED(q);
     ACK_UNUSED(q_dot);
 
-    std::cout << "SET CONVERT TO X" << std::endl;
   }
 
   virtual void convertToQ(const typename base::VectorX &x, typename base::VectorQ *q) const {
 
     ACK_UNUSED(x);
     ACK_UNUSED(q);
-
-    std::cout << "SET CONVERT TO Q" << std::endl;
 
   }
 };

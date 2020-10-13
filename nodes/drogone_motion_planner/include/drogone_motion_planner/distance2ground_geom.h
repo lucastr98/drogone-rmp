@@ -9,11 +9,8 @@
 namespace rmpcpp {
 
 /**
- * Example of a cylindrical geometry that maps to a plane.
- * Here, the task space is the unit sphere, and the configuration space is R^3
- *
- * X Task space coordinates are: theta, rho, z
- * Q Configuration space coordinates are: x,y,z
+ * X Task space coordinates are: d2g
+ * Q Configuration space coordinates are: x,y,z,yaw
  */
 class Distance2GroundGeometry : public GeometryBase<1, 4> {
   // type alias for readability.
@@ -49,15 +46,12 @@ class Distance2GroundGeometry : public GeometryBase<1, 4> {
     ACK_UNUSED(q);
     ACK_UNUSED(q_dot);
 
-    std::cout << "DISTANCE2GORUND GEOM: SET CONVERT TO X" << std::endl;
   }
 
   virtual void convertToQ(const typename base::VectorX &x, typename base::VectorQ *q) const {
 
     ACK_UNUSED(x);
     ACK_UNUSED(q);
-
-    std::cout << "DISTANCE2GROUND GEOM: SET CONVERT TO Q" << std::endl;
 
   }
 };

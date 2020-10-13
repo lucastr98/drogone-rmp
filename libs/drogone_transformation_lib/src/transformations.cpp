@@ -4,7 +4,9 @@ namespace drogone_transformation_lib{
 
 Transformations::Transformations(){};
 
-void Transformations::setCameraConfig(PinholeConstants pinhole_constants, CameraMounting camera_mounting, ros::NodeHandle nh){
+void Transformations::setCameraConfig(PinholeConstants pinhole_constants,
+                                      CameraMounting camera_mounting,
+                                      ros::NodeHandle nh){
   pinhole_constants_ = pinhole_constants;
   camera_mounting_ = camera_mounting;
   pub_noise_ = nh.advertise<drogone_msgs_rmp::noise>("noise", 0);
@@ -94,7 +96,9 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
     // calculate stddev of x and y
     double s_x_C = abs(target_C[2] * tol_u_ / pinhole_constants_.f_x);
     double s_y_C = abs(target_C[2] * tol_v_ / pinhole_constants_.f_y);
-    double s_z_C = abs(d_drone_ * pinhole_constants_.f_x * abs(1 / (tol_d_ + pinhole_constants_.f_x * (d_drone_ / target_C[2])) - 1 / (pinhole_constants_.f_x * d_drone_ / target_C[2])));
+    double s_z_C = abs(d_drone_ * pinhole_constants_.f_x *
+                   abs(1 / (tol_d_ + pinhole_constants_.f_x * (d_drone_ / target_C[2])) -
+                   1 / (pinhole_constants_.f_x * d_drone_ / target_C[2])));
 
     rand_noise_x_C_ = std::normal_distribution<double>(0.0, s_x_C / 10);
     rand_noise_y_C_ = std::normal_distribution<double>(0.0, s_y_C / 10);
@@ -134,7 +138,8 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
   // calculate distance to have full detection
   Eigen::Matrix<double, 3, 1> detection;
   // double distance = (target_W - uav_pose_.translation()).norm();
-  double distance = std::sqrt(target_C[0] * target_C[0] + target_C[1] * target_C[1] + target_C[2] * target_C[2]);
+  double distance = std::sqrt(target_C[0] * target_C[0] + target_C[1] * target_C[1]
+                              + target_C[2] * target_C[2]);
   detection[0] = u_v_normalized[0];
   detection[1] = u_v_normalized[1];
   detection[2] = distance;
@@ -148,7 +153,9 @@ std::pair<Eigen::Matrix<double, 3, 1>, double> Transformations::PosWorld2Image(E
   return return_pair;
 }
 
-Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d target_pos_W, Eigen::Vector3d uav_vel, double normalization){
+Eigen::Matrix<double, 3, 1> Transformations::VelWorld2Image(Eigen::Vector3d target_pos_W,
+                                                            Eigen::Vector3d uav_vel,
+                                                            double normalization){
   // calculate relative target velocity (without tracker information that's just 0 - uav_vel)
   Eigen::Vector3d target_rel_vel_W = -uav_vel;
 
@@ -206,7 +213,8 @@ Eigen::Vector3d Transformations::PosImage2World(Eigen::Matrix<double, 3, 1> dete
 }
 
 // set noise parameters
-void Transformations::setNoiseParams(double d_drone, double tol_u, double tol_v, double tol_d, bool reset_noise){
+void Transformations::setNoiseParams(double d_drone, double tol_u, double tol_v,
+                                     double tol_d, bool reset_noise){
   d_drone_ = d_drone;
   tol_u_ = tol_u;
   tol_v_ = tol_v;

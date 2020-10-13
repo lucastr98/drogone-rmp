@@ -93,6 +93,7 @@ class RMPPlanner{
     ros::Time time_of_last_detection_;
 
     // parameters that are changed depending on which state the uav is in
+    std::pair<bool, double> adjust_follow_distance_;
     double u_target_;
     double v_target_;
     double uv_alpha_;
@@ -134,6 +135,7 @@ class RMPPlanner{
     double sampling_interval_;
     double a_max_W_;
     double target_velocity_;
+    bool no_catch_;
 
     // condition variable
     std::condition_variable cond_var_;

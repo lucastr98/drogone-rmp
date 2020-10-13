@@ -35,9 +35,8 @@ class Distance2GroundPolicy : public PolicyBase<n> {
  public:
   /**
    * Sets up the policy.
-   * target is the target to move to.
    * A is the metric to be used.
-   * alpha, beta and c are tuning parameters.
+   * alpha and beta are tuning parameters.
    */
   Distance2GroundPolicy(Matrix A, double alpha, double beta)
       : alpha_(alpha), beta_(beta) {
@@ -53,7 +52,6 @@ class Distance2GroundPolicy : public PolicyBase<n> {
     if(this->f_[0] > max_acc_){
       this->f_[0] = max_acc_;
     }
-    // std::cout << this->f_ << std::endl;
   }
 
   void setMaxAcc(double max_acc){

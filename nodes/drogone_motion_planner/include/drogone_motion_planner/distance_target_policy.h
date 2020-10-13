@@ -35,9 +35,8 @@ class DistanceTargetPolicy : public PolicyBase<n> {
  public:
   /**
    * Sets up the policy.
-   * target is the target to move to.
    * A is the metric to be used.
-   * alpha, beta and c are tuning parameters.
+   * beta and c are tuning parameters.
    */
   DistanceTargetPolicy(Vector target, Matrix A, double beta, double c)
       : target_(target), beta_(beta), c_(c) {
@@ -53,7 +52,6 @@ class DistanceTargetPolicy : public PolicyBase<n> {
     if(!target_passed_){
       this->f_ = s(this->space_->minus(target_, x)) * max_acc_ - beta_ * x_dot;
       if(this->f_[0] > 0 && target_ == Vector::Zero()){
-        // std::cout << "IT TRIES TO DECCELERATE" << std::endl;
         this->f_ = Vector::Zero();
       }
     }

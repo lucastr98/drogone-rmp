@@ -65,7 +65,6 @@ class TrapezoidalIntegrator {
     last_acc_ = acceleration;
     distance_ = 0.0;
     done_ = false;
-    counter_ = 0;
   }
 
   void setX(const Vector_x1 pos_x1, Vector_x1 x1_dot,
@@ -113,7 +112,6 @@ class TrapezoidalIntegrator {
     pol_vec.push_back(acc_b1);
     pol_vec.push_back(acc_b2);
     pol_vec.push_back(acc_b3);
-    // acc_b_sum = PolicyBaseQ::sum(pol_vec);
     acc_b_sum = PolicyBaseQ::new_sum(pol_vec, percentages_);
     acc_b = acc_b_sum.getf();
 
@@ -131,8 +129,6 @@ class TrapezoidalIntegrator {
     if ((acc_b.norm() < 0.01 && current_vel_.norm() < 0.01) ){
       done_ = true;
     }
-
-    counter_ += 1;
 
     return current_pos_;
   }
@@ -168,7 +164,6 @@ class TrapezoidalIntegrator {
   Vector_x2 pos_x3_{Vector_x3::Zero()};
   Vector_x2 x3_dot_{Vector_x3::Zero()};
   Vector_q last_acc_{Vector_q::Zero()};
-  uint counter_ = 0;
   std::vector<double> percentages_;
 };
 

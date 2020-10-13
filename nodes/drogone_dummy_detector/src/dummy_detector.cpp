@@ -110,6 +110,7 @@ void DummyDetector::victim_callback(const trajectory_msgs::MultiDOFJointTrajecto
   tf::vectorMsgToEigen(victim_traj.points[0].transforms[0].translation, target_pos_W);
 
   // check if target position has changed more than 1m since last detection and reset noise param then
+  // only happens when victim position is changed in simulation
   bool reset_noise;
   double distance = (target_pos_W - last_target_pos_).norm();
   if(distance > 1.0){

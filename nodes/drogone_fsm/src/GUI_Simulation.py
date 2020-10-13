@@ -291,6 +291,11 @@ def change_starting_point_callback():
         if not len(starting_point_z.get()) == 0:
             parameters.data[5] = float(starting_point_z.get())
 
+        if len(starting_point_x.get()) == 0 and len(starting_point_y.get()) == 0 and len(starting_point_z.get()) == 0:
+            parameters.data[18] = 1
+        else:
+            parameters.data[18] = 0
+
         pub_victim.publish(parameters)
 
 if __name__ == '__main__':
@@ -319,7 +324,7 @@ if __name__ == '__main__':
     rospy.Subscriber("/visualization/Dijkstra", DijkstraViz, maps.intersection_cb, queue_size=100)
 
     # size of array for communication iwith victim drone
-    size_of_array = 18
+    size_of_array = 19
 
 
 
@@ -425,7 +430,7 @@ if __name__ == '__main__':
     starting_point_y.set("")
     Entry(frame, textvariable = starting_point_y,  width = 5).grid(row=6, column=5)
     starting_point_z = StringVar()
-    starting_point_z.set("7")
+    starting_point_z.set("")
     Entry(frame, textvariable = starting_point_z,  width = 5).grid(row=6, column=6)
 
     #initialize GUI Server class

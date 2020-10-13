@@ -17,3 +17,4 @@ sampling_interval: 0.01
 a_max: 8.0
 
 target_velocity: 2.0
+no_catch: False

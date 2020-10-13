@@ -35,9 +35,8 @@ class CameraTargetPolicy : public PolicyBase<n> {
  public:
   /**
    * Sets up the policy.
-   * target is the target to move to.
    * A is the metric to be used.
-   * alpha, beta and c are tuning parameters.
+   * beta and c are tuning parameters.
    */
   CameraTargetPolicy(Vector target, Matrix A, double beta, double c)
       : target_(target), beta_(beta), c_(c) {

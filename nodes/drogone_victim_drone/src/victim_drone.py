@@ -544,17 +544,34 @@ class VictimDrone(object):
 
         # starting point parameters
         if data.data[2] == 1.0:
-            self.starting_point.x = data.data[3]
-            self.starting_point.y = data.data[4]
-            self.starting_point.z = data.data[5]
+            if data.data[18] == 1.0:
+                self.phi_eval = np.random.uniform(0, 2 * np.pi)
+                self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
+                self.z_C_eval = np.random.uniform(5, 15)
+                init_px_eval = np.random.uniform(200, 600)
+                u_eval = np.cos(self.phi_eval) * init_px_eval
+                v_eval = np.sin(self.phi_eval) * init_px_eval
+                x_C_eval = u_eval / 1140 * self.z_C_eval
+                y_C_eval = v_eval / 1140 * self.z_C_eval
+                self.starting_point.x = x_C_eval
+                self.starting_point.y = y_C_eval
+                self.starting_point.z = self.z_C_eval + 10.0
+            else:
+                self.starting_point.x = data.data[3]
+                self.starting_point.y = data.data[4]
+                self.starting_point.z = data.data[5]
             self.start_moving = data.data[0]
             self.initialize = 1
             self.caught = 0
             self.delete_traj = 1
             self.reset = True
 
+
         # vector of linear moving victim drone parameters
         elif data.data[6] == 1.0:
+            if data.data[7] != 0.0 or data.data[8] != 0.0 or data.data[9] != 0.0:
+                self.theta_eval= math.acos(data.data[9]/np.sqrt(data.data[7]**2 + data.data[8]**2 + data.data[9]**2))
+                self.phi_eval = math.atan2(data.data[8], data.data[7])
             direction_x_eval = np.sin(self.theta_eval) * np.cos(self.phi_eval)
             direction_y_eval = np.sin(self.theta_eval) * np.sin(self.phi_eval)
             direction_z_eval = np.cos(self.theta_eval)
