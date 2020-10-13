@@ -1,0 +1,39 @@
+<?xml version='1.0'?>
+<sdf version='1.5'>
+    <model name='huenliwald_mesh'>
+        <pose>0 0 0 0 0 0</pose>
+        <link name='huenliwald_link'>
+            <pose>0 0 0 0 -0 0</pose>
+            <gravity>1</gravity>
+            <self_collide>0</self_collide>
+            <kinematic>0</kinematic>
+            <collision name='huenliwald_collision'>
+                <pose>0 0 0 0 -0 0</pose>
+                <geometry>
+                    <mesh>
+                        <uri>model://huenliwald_mesh/meshes/huenliwald.stl</uri>
+                        <scale>1 1 1</scale>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name='huenliwald_visual'>
+                <pose>0 0 0 0 -0 0</pose>
+                <cast_shadows>1</cast_shadows>
+                <geometry>
+                        <mesh>
+			 <uri>model://huenliwald_mesh/meshes/huenliwald.stl</uri>
+                        <scale>1 1 1</scale>
+                        </mesh>
+                </geometry>
+		  <material>
+                    <script>
+                        <uri>model://huenliwald_mesh/materials/backfaceculling.material</uri>
+                        <name>backfaceculling/color</name>
+                    </script>
+                </material>
+            </visual>
+        </link>
+        <static>1</static>
+        <allow_auto_disable>1</allow_auto_disable>
+    </model>
+</sdf>

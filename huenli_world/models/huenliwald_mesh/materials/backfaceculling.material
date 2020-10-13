@@ -1,0 +1,14 @@
+material backfaceculling/color
+{
+    technique
+    {
+        pass
+        {
+            ambient 0.5 0.5 0.5
+            diffuse 0.8 0.8 0.8
+            specular 1 1 1 65
+
+            lightning off
+        }
+    }
+}
