@@ -1,4 +1,4 @@
-evaluation: follow_distances
+evaluation: distance2ground
 target_velocity: two
 flight_path: random
 success:
@@ -13,12 +13,12 @@ init_px_err:
   - 400_noise
   # - 600_noise
 rosbags:
-  - test0
+  # - test0
   # - test1
   # - test2
   # - test3
   # - test4
-  # - test5
+  - test5
   # - test6
   # - test7
   # - test8
@@ -28,12 +28,12 @@ rosbags:
   # - test12
   # - test13
   # - test14
-  # - new_test0
+  - new_test0
 catch_success:
   - 15
   - 14
   - 10
   - 12
   - 2
-time_tot: 20.0
+time_tot: 15.0
 roll_pitch_zero: False

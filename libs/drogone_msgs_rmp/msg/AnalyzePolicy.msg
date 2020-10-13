@@ -1,9 +1,0 @@
-std_msgs/Header header
-float32 u_diff
-float32 v_diff
-float32 acc_u_diff
-float32 acc_v_diff
-float32 u_dot
-float32 v_dot
-float32 acc_u_dot
-float32 acc_v_dot

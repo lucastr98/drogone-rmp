@@ -326,9 +326,14 @@ elif(evaluation == 'recover'):
         target_positions.append(msg.pose.pose.position)
         counter += 1
 
+    horizontal_distances = []
+    for i in range(len(target_positions)):
+        horizontal_distances.append(math.sqrt((target_positions[i].x - uav_poses[i].position.x)**2 + (target_positions[i].y - uav_poses[i].position.y)**2))
+
     fig = plt.figure()
-    ax1 = fig.add_subplot(2, 1, 1)
-    ax2 = fig.add_subplot(2, 1, 2)
+    ax1 = fig.add_subplot(3, 1, 1)
+    ax2 = fig.add_subplot(3, 1, 2)
+    ax3 = fig.add_subplot(3, 1, 3)
     time = np.linspace(0, time_tot - 0.01, time_tot * 100)
 
     T_B_W_1 = []
@@ -398,6 +403,9 @@ elif(evaluation == 'recover'):
     u_2_1 = u_2[0 : recover_sw[0]]
     u_2_2 = u_2[recover_sw[0] : back2follow_sw[0]]
     u_2_3 = u_2[back2follow_sw[0] : len(u_2)]
+    h_d_1 = horizontal_distances[0 : recover_sw[0]]
+    h_d_2 = horizontal_distances[recover_sw[0] : back2follow_sw[0]]
+    h_d_3 = horizontal_distances[back2follow_sw[0] : len(horizontal_distances)]
     time_1 = time[0 : recover_sw[0]]
     time_2 = time[recover_sw[0] : back2follow_sw[0]]
     time_3 = time[back2follow_sw[0] : len(time)]
@@ -408,25 +416,30 @@ elif(evaluation == 'recover'):
     ax2.plot(time_1, u_2_1, c='c')
     ax2.plot(time_2, u_2_2, c='b')
     ax2.plot(time_3, u_2_3, c='c')
+    ax3.plot(time_1, h_d_1, c='c')
+    ax3.plot(time_2, h_d_2, c='b')
+    ax3.plot(time_3, h_d_3, c='c')
 
     # ax1.set_xlabel('time [s]')
-    ax1.set_ylabel('u [px]')
     ax1.set_title('actual roll and pitch')
-    ax2.set_xlabel('time [s]')
-    ax2.set_ylabel('u [px]')
     ax2.set_title('roll and pitch zero')
-
-    fig.suptitle('Recover Mode', y=0.95, fontweight='bold')
+    ax3.set_title('horizontal distance')
+    ax3.set_xlabel('time [s]')
+    ax1.set_ylabel('u [px]')
+    ax2.set_ylabel('u [px]')
+    ax3.set_ylabel('m [px]')
 
     handles = []
     handles.append(mpatches.Patch(color='c', label='Follow Mode'))
     handles.append(mpatches.Patch(color='b', label='Recover Mode'))
     ax1.legend(handles=handles)
     ax2.legend(handles=handles)
+    ax3.legend(handles=handles)
 
 
     ax1.grid()
     ax2.grid()
+    ax3.grid()
 
     plt.show()
 

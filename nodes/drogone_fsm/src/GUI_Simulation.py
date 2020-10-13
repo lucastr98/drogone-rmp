@@ -248,6 +248,7 @@ def eight_path_callback():
         if not len(victim_drone_distance.get()) == 0:
             parameters.data[15] = float(victim_drone_distance.get())
         pub_victim.publish(parameters)
+        command_1_callback()
 
 #random moving drone
 def random_path_callback():

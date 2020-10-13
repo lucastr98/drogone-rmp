@@ -21,7 +21,6 @@
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <drogone_msgs_rmp/target_detection.h>
 #include <drogone_transformation_lib/transformations.h>
-#include <drogone_msgs_rmp/AccFieldWithState.h>
 #include <geometry_msgs/PoseArray.h>
 #include <geometry_msgs/PointStamped.h>
 
@@ -56,7 +55,6 @@ class RMPPlanner{
     void SubDetection();
     void detection_callback(const drogone_msgs_rmp::target_detection& victim_pos);
     void planTrajectory();
-    void updateWeights(double u, double v, double d);
     bool Land();
 
     bool accuracy_reached(const Eigen::Vector3d& goal_pos, double waiting_time);
@@ -64,17 +62,10 @@ class RMPPlanner{
                            Eigen::Matrix<double, 4, 1> traj_vel,
                            Eigen::Matrix<double, 4, 1> traj_acc,
                            trajectory_msgs::MultiDOFJointTrajectory *msg);
-    void publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
-                                 Eigen::Matrix<double, 2, 1> u_v,
-                                 Eigen::Matrix<double, 2, 1> u_v_dot,
-                                 Eigen::Matrix<double, 1, 1> f_d,
-                                 Eigen::Matrix<double, 1, 1> d,
-                                 Eigen::Matrix<double, 1, 1> d_dot,
-                                 double t);
 
   protected:
     actionlib::SimpleActionServer<drogone_action_rmp::FSMAction> as_;
-    std::string action_name_; //variable which has name of actionserve
+    std::string action_name_;
 
   private:
     // Publishers & Subscribers
@@ -101,11 +92,6 @@ class RMPPlanner{
     double old_stamp_;
     ros::Time time_of_last_detection_;
 
-    Eigen::Vector3d cur_target_pos_;
-    ros::Time follow_starting_time_;
-
-    std::string mode_;
-
     // parameters that are changed depending on which state the uav is in
     double u_target_;
     double v_target_;
@@ -128,34 +114,30 @@ class RMPPlanner{
     drogone_transformation_lib::CameraMounting camera_mounting_;
     drogone_transformation_lib::Transformations transformer_;
 
-    DetectorInfo detection_;
-
     // metrics
     double a_d_;
     double a_d2g_;
     double a_u_;
     double a_v_;
 
+    // other trajectory generation parameters
+    DetectorInfo detection_;
     bool first_detection_;
-
     bool target_passed_;
+    Eigen::Vector3d cur_target_pos_;
+    std::string mode_;
 
+    // parameters set in yaml file
     double accuracy_ = 0.3;
-    double a_max_W_;
     double frequency_;
     double MPC_horizon_;
     double sampling_interval_;
-    bool stop_sub_;
-
-    double normalize_u_v_;
+    double a_max_W_;
+    double target_velocity_;
 
     // condition variable
     std::condition_variable cond_var_;
     std::mutex mutex_;
-
-    // analyze computational time
-    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t1_;
-    std::chrono::time_point<std::chrono::high_resolution_clock> chrono_t2_;
 };
 
 } // namespace drogone_motion_planning

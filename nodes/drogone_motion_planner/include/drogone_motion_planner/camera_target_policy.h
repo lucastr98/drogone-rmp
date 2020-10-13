@@ -21,7 +21,6 @@
 #define RMPCPP_POLICIES_CAMERA_TARGET_POLICY_H_
 #include <rmpcpp/core/policy_base.h>
 #include <ros/ros.h>
-#include <drogone_msgs_rmp/AnalyzePolicy.h>
 namespace rmpcpp {
 
 /**
@@ -57,22 +56,6 @@ class CameraTargetPolicy : public PolicyBase<n> {
     else{
       this->f_ = Vector::Zero();
     }
-  }
-
-  std::vector<Eigen::Matrix<double, 2, 1>> plotImageAcc(){
-    std::vector<Eigen::Matrix<double, 2, 1>> the_returner;
-    for(int i = -1024; i <= 1024; i += 64){
-      for(int j = -768; j <= 768; j += 64){
-        Eigen::Matrix<double, 2, 1> x, x_dot;
-        x(0, 0) = i;
-        x(1, 0) = j;
-        x_dot(0, 0) = 0;
-        x_dot(1, 0) = 0;
-        this->setState(x, x_dot);
-        the_returner.push_back(this->f_);
-      }
-    }
-    return the_returner;
   }
 
   void setMaxAcc(double max_acc){

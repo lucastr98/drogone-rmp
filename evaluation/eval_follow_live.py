@@ -4,8 +4,12 @@ import rosbag
 import math
 import numpy as np
 import time
+from matplotlib.pyplot import cm
+from matplotlib import gridspec
 
-bag = rosbag.Bag("test1.bag")
+plt.rcParams.update({'font.size': 15})
+
+bag = rosbag.Bag("/home/severin/luca_ws/rosbags/follow_evaluation/presentation/test1.bag")
 
 start_time = 65.0
 end_time = 85.0
@@ -125,7 +129,11 @@ for j in range(0, len(T_B_W)):
     v.append(u_v[1] / u_v[2])
 
 fig = plt.figure()
-ax1 = fig.add_subplot(1, 1, 1)
+gs = gridspec.GridSpec(1, 2, width_ratios=[5, 1])
+ax1 = fig.add_subplot(gs[0])
+ax2 = fig.add_subplot(gs[1])
+
+# ax1 = fig.add_subplot(1, 1, 1)
 
 ax1.set_xlim(-1024, 1024)
 ax1.set_ylim(-768, 768)
@@ -147,30 +155,39 @@ circle40 = plt.Circle((0, 0), math.tan(40.0 / 180.0 * np.pi) * 1140, color=[1, 0
 ax1.add_patch(circle40)
 ax1.annotate('$40 deg$', xy=(math.sqrt(2) / 2 * math.tan(40.0 / 180.0 * np.pi) * 1140, math.sqrt(2) / 2 * math.tan(40.0 / 180.0 * np.pi) * 1140), ha='left', va='bottom', size=10, color=[1, 0.6, 0.6])
 
-def animate(i):
-    if(i < len(u)):
-        ax1.plot(u[i], v[i], '.', c='b')
-        if(len(str(i)) == 1):
-            fig.savefig('plot-000' + str(i) + '.png')
-        elif(len(str(i)) == 2):
-            fig.savefig('plot-00' + str(i) + '.png')
-        elif(len(str(i)) == 3):
-            fig.savefig('plot-0' + str(i) + '.png')
-        elif(len(str(i)) == 4):
-            fig.savefig('plot-' + str(i) + '.png')
-    else:
-        print("finished")
+# def animate(i):
+#     if(i < len(u)):
+#         ax1.plot(u[i], v[i], '.', c='b')
+#         if(len(str(i)) == 1):
+#             fig.savefig('plot-000' + str(i) + '.png')
+#         elif(len(str(i)) == 2):
+#             fig.savefig('plot-00' + str(i) + '.png')
+#         elif(len(str(i)) == 3):
+#             fig.savefig('plot-0' + str(i) + '.png')
+#         elif(len(str(i)) == 4):
+#             fig.savefig('plot-' + str(i) + '.png')
+#     else:
+#         print("finished")
+#
+#
+#
+# ani = animation.FuncAnimation(fig, animate, interval=10)
 
+color = iter(cm.rainbow(np.linspace(0, 1, len(u))))
+for i in range(0, len(u)):
+    c = next(color)
+    ax1.plot(u[i], v[i], '.', c=c)
+    ax2.axhline(i * 0.01, color=c)
 
-
-ani = animation.FuncAnimation(fig, animate, interval=10)
-# ani.save('animation.mp4')
+ax2.set_ylim(0, 20)
+ax2.set_xticklabels([])
+ax2.set_ylabel("time [s]")
+ax2.yaxis.set_label_position("right")
+ax2.yaxis.tick_right()
+plt.show()
 
 # mng = plt.get_current_fig_manager()
 # mng.resize(*mng.window.maxsize())
-
-plt.show()
-
 
 # for i in range(len(pose_times)):
 #     print(pose_times[i] == target_times[i], i)

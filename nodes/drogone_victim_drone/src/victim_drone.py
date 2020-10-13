@@ -17,8 +17,6 @@ class VictimDrone(object):
 
     def __init__(self,name):
 
-        # self.linear_counter = 0
-
         #parameters of the trajectory/path, params with ** at the end are changeable parameters (most of them are also changeable in the GUI)
         #--------------------------------------------------------help variables--------------------------------------------------
         self.start_moving = 0
@@ -42,8 +40,8 @@ class VictimDrone(object):
         #------------------------------------linear path---------------------------------------------
         #vector of linear moving victim drone, normalized
         self.motion_vector = Vector3()
-        self.motion_vector.x = 1/math.sqrt(2) #**
-        self.motion_vector.y = 1/math.sqrt(2) #**
+        self.motion_vector.x = 1 #**
+        self.motion_vector.y = 0 #**
         self.motion_vector.z = 0 #**
 
 
@@ -208,7 +206,6 @@ class VictimDrone(object):
                             victim_traj.points.append(victim_traj_point)
 
                         #add time_from_start for each Point
-                        # time_from_start = rospy.Time.now()
                         time_from_start = rospy.Time(0)
                         for i in range(0, len(victim_traj.points)):
                             victim_traj.points[i].time_from_start = time_from_start
@@ -259,21 +256,6 @@ class VictimDrone(object):
         return victim_pose
 
     def linear_path(self, current_pose):
-        # self.linear_counter += 1
-        # rospy.logwarn(self.linear_counter)
-        # if(self.linear_counter > 600):
-        #     self.velocity = 4
-
-        # self.linear_counter += 1
-        # if self.linear_counter > 1200 and self.linear_counter < 1300:
-        #     theta_old = math.acos(self.motion_vector.z/1)
-        #     phi_old = math.atan2(self.motion_vector.y, self.motion_vector.x)
-        #     theta_new = theta_old + np.pi / 600
-        #     phi_new = phi_old + np.pi / 400
-        #     self.motion_vector.x =  math.sin(theta_new) * math.cos(phi_new)
-        #     self.motion_vector.y =  math.sin(theta_new) * math.sin(phi_new)
-        #     self.motion_vector.z =  math.cos(theta_new)
-
         #distance covered in certain time interval
         ds = self.velocity * self.dt
 
@@ -388,18 +370,6 @@ class VictimDrone(object):
 
         # transfer victim velocity vector from kartesian x,y,z into spherical coordinates r, phi, theta
         r = np.sqrt(twist.linear.x*twist.linear.x + twist.linear.y*twist.linear.y + twist.linear.z*twist.linear.z)
-        # if velocity == 0 take the motion vector as startign vector
-        # if r == 0:
-        #     twist.linear.x = self.motion_vector.x
-        #     twist.linear.y = self.motion_vector.y
-        #     twist.linear.z = self.motion_vector.z
-        #     # r = 1 # as motion vector is of magnitude 1
-        #     theta_old = math.acos(twist.linear.z/1)
-        #     phi_old = math.atan2(twist.linear.y, twist.linear.x)
-        #     rospy.logwarn(theta_old)
-        # else:
-        #     theta_old = math.acos(twist.linear.z/r)
-        #     phi_old = math.atan2(twist.linear.y, twist.linear.x)
         if self.reset == True:
             twist.linear.x = self.motion_vector.x
             twist.linear.y = self.motion_vector.y
@@ -410,13 +380,6 @@ class VictimDrone(object):
 
         #calculate new angles with randomly picked angle difference
         if self.outside_arena == 0 and self.above_arena == 0 and self.below_arena == 0:
-            # if r == 0:
-            #     theta_new = theta_old
-            #     phi_new = phi_old
-            #     r = 1
-            # else:
-            #     theta_new = np.random.uniform(-self.theta_spread, self.theta_spread) * np.pi/180 + theta_old
-            #     phi_new = np.random.uniform(- self.phi_spread, self.phi_spread) * np.pi/180 + phi_old
             if self.reset == True:
                 theta_new = theta_old
                 phi_new = phi_old
@@ -571,8 +534,7 @@ class VictimDrone(object):
             self.delete_traj = 1
         #velocity
         if not data.data[1] == 0.0:
-            # self.velocity = data.data[1]
-            self.velocity = 2
+            self.velocity = data.data[1]
 
         #angle spread
         if not data.data[16] == 0.0:
@@ -589,23 +551,6 @@ class VictimDrone(object):
             self.initialize = 1
             self.caught = 0
             self.delete_traj = 1
-
-            # for evaluation
-            self.phi_eval = 0
-            self.theta_eval = np.pi / 2
-            self.z_C_eval = 13
-            init_px_eval = 400
-            # self.phi_eval = np.random.uniform(0, 2 * np.pi)
-            # self.theta_eval = np.random.uniform(np.pi / 3, np.pi / 3 * 2)
-            # self.z_C_eval = np.random.uniform(5, 15)
-            # init_px_eval = np.random.uniform(200, 600)
-            u_eval = np.cos(self.phi_eval) * init_px_eval
-            v_eval = np.sin(self.phi_eval) * init_px_eval
-            x_C_eval = u_eval / 1140 * self.z_C_eval
-            y_C_eval = v_eval / 1140 * self.z_C_eval
-            self.starting_point.x = x_C_eval
-            self.starting_point.y = y_C_eval
-            self.starting_point.z = self.z_C_eval + 30.0
             self.reset = True
 
         # vector of linear moving victim drone parameters
@@ -618,11 +563,6 @@ class VictimDrone(object):
             self.motion_vector.y = direction_y_eval / magnitude
             self.motion_vector.z = direction_z_eval / magnitude
 
-            #normalize vector
-            # magnitude = np.sqrt(data.data[7]*data.data[7] + data.data[8]*data.data[8] + data.data[9]*data.data[9])
-            # self.motion_vector.x = data.data[7]/ magnitude
-            # self.motion_vector.y = data.data[8]/ magnitude
-            # self.motion_vector.z = data.data[9]/ magnitude
             self.delete_traj = 1
 
 
@@ -637,9 +577,6 @@ class VictimDrone(object):
         self.drogone_odom = data
 
 if __name__ == '__main__':
-
-    # #wait 3 seconds till everyhthing starts up
-    # rospy.sleep(5.0)
 
     rospy.init_node('Victim_Drone')
     rospy.logwarn('VICTIM DRONE: VICTIM DRONE IS READY')

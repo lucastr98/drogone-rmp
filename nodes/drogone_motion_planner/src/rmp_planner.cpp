@@ -16,21 +16,18 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
     // publisher for trajectory to drone
     pub_pose_ = nh_.advertise<geometry_msgs::PoseStamped>(
         mav_msgs::default_topics::COMMAND_POSE, 1);
-
-    // publisher for f_u_v for visualization
-    pub_analyzation_ = nh_.advertise<drogone_msgs_rmp::AccFieldWithState>("acc_field_analyzation", 0);
-
+        
     // subscriber to Odometry for physical uav state
-    sub_odom_ =
-        nh_.subscribe("uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
+    sub_odom_ = nh_.subscribe(
+        "uav_pose", 1, &RMPPlanner::uavOdomCallback, this);
 
     // subscriber to Altitude
-    sub_altitude_ =
-        nh_.subscribe("/altitude_node/intersection", 1, &RMPPlanner::AltitudeCallback, this);
+    sub_altitude_ = nh_.subscribe(
+        "/altitude_node/intersection", 1, &RMPPlanner::AltitudeCallback, this);
 
     // subscriber to Trajectory for trajectory uav state
-    sub_traj_ =
-        nh_.subscribe("command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
+    sub_traj_ = nh_.subscribe(
+        "command/trajectory", 1, &RMPPlanner::uavTrajCallback, this);
 
     // load params
     if(!nh_private_.getParam("f_x", pinhole_constants_.f_x)){
@@ -80,6 +77,10 @@ RMPPlanner::RMPPlanner(std::string name, ros::NodeHandle nh, ros::NodeHandle nh_
 
     if(!nh_private_.getParam("a_max", a_max_W_)){
       ROS_ERROR("failed to load a_max");
+    }
+
+    if(!nh_private_.getParam("target_velocity", target_velocity_)){
+      ROS_ERROR("failed to load target_velocity");
     }
 
     transformer_.setCameraConfig(pinhole_constants_, camera_mounting_, nh_);
@@ -157,8 +158,10 @@ void RMPPlanner::uavTrajCallback(const trajectory_msgs::MultiDOFJointTrajectory:
 
   double roll, pitch, yaw;
   yaw = trajectory_uav_state_.yaw;
-  double a_x_B = trajectory_uav_state_.acceleration[0] * cos(yaw) + trajectory_uav_state_.acceleration[1] * sin(yaw);
-  double a_y_B = trajectory_uav_state_.acceleration[1] * cos(yaw) - trajectory_uav_state_.acceleration[0] * sin(yaw);
+  double a_x_B = trajectory_uav_state_.acceleration[0] * cos(yaw) +
+                 trajectory_uav_state_.acceleration[1] * sin(yaw);
+  double a_y_B = trajectory_uav_state_.acceleration[1] * cos(yaw) -
+                 trajectory_uav_state_.acceleration[0] * sin(yaw);
   double a_z_B = trajectory_uav_state_.acceleration[2];
   roll = atan2(a_y_B, a_z_B + 9.81);
   pitch = atan2(a_x_B, a_z_B + 9.81);
@@ -174,7 +177,7 @@ bool RMPPlanner::TakeOff(){
   ROS_WARN_STREAM("MP ----- TAKE OFF");
 
   Eigen::Vector3d take_off_pos;
-  take_off_pos << 0.0, 0.0, 30.0;
+  take_off_pos << 0.0, 0.0, 10.0;
 
   geometry_msgs::PoseStamped take_off_pose_msg;
   take_off_pose_msg.pose.position.x = take_off_pos[0];
@@ -197,7 +200,6 @@ bool RMPPlanner::TakeOff(){
 void RMPPlanner::SubDetection(){
   first_detection_ = true;
   sub_follow_ = nh_.subscribe("victim_pos", 10, &RMPPlanner::detection_callback, this);
-  follow_starting_time_ = ros::Time::now();
 
   // lock the mutex and wait until it is unlocked (in catch_traj, once last traj is calculated)
   std::unique_lock<std::mutex> uLock(mutex_);
@@ -232,13 +234,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     planning_uav_state_ = trajectory_uav_state_;
   }
 
-  // // for evaluation stop following after a certain amount of seconds
-  // ros::Time current_time = ros::Time::now();
-  // if((current_time - follow_starting_time_).toSec() > 21.0){
-  //   ROS_WARN_STREAM("FINISHED");
-  //   return;
-  // }
-
   // set target_passed_ false again if the target is passed the replanning stops anyway
   target_passed_ = false;
 
@@ -266,7 +261,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   detection << victim_pos.u, victim_pos.v, victim_pos.d;
   cur_target_pos_ = transformer_.PosImage2World(detection);
 
-  /* SET WEIGHTS */
   // calculate u, v and d with roll = pitch = 0 assumption
   Eigen::Quaterniond q(planning_uav_state_.pose.linear());
   double roll, pitch, yaw;
@@ -320,10 +314,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
     mode_ = "follow";
   }
 
-  // if(mode_ == "catch"){
-  //   mode_ = "follow";
-  // }
-
   if(mode_ == "catch"){
     a_d_ = 4.0;
     d_target_ = 0.0;
@@ -363,18 +353,28 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   }
 
   /* SET THE POLICY VARIABLES */
-  // uv_beta_ = 5.0;       // 0m/s
-  uv_beta_ = 2.9;       // 2m/s
-  // uv_beta_ = 1.8;       // 4m/s
   u_target_ = 0.0;
   v_target_ = 0.0;
   uv_c_ = 0.05;
-  // d_beta_ = 5.0;        // 0m/s
-  d_beta_ = 5.0;        // 2m/s
-  // d_beta_ = 2.7;        // 4m/s
   d_c_ = 0.5;
   d2g_alpha_ = 3;
   d2g_beta_ = 0.5;
+  double deactivate_damper_distance;
+  if(target_velocity_ == 0.0){
+    uv_beta_ = 5.0;
+    d_beta_ = 5.0;
+    deactivate_damper_distance = 2.0;
+  }
+  else if(target_velocity_ == 2.0){
+    uv_beta_ = 2.9;
+    d_beta_ = 5.0;
+    deactivate_damper_distance = 2.0;
+  }
+  else if(target_velocity_ == 4.0){
+    uv_beta_ = 1.8;
+    d_beta_ = 2.7;
+    deactivate_damper_distance = 3.0;
+  }
 
   if(mode_ == "recover"){
     uv_beta_ = 0.0;
@@ -382,9 +382,7 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
   if(mode_ == "recover_distance"){
     d_beta_ = 1.0;
   }
-  if(mode_ == "catch" && d < 2.0 && d > 0.8){
-  // if(mode_ == "catch" && d < 3.0 && d > 0.8){
-    ROS_WARN_STREAM("MP ----- DISABLED UV DAMPER TO CATCH");
+  if(mode_ == "catch" && d < deactivate_damper_distance && d > 0.8){
     uv_beta_ = 0.0;
   }
 
@@ -393,8 +391,6 @@ void RMPPlanner::detection_callback(const drogone_msgs_rmp::target_detection& vi
 }
 
 void RMPPlanner::planTrajectory(){
-  // chrono_t1_ = std::chrono::high_resolution_clock::now();
-
   // define geometries
   using camera_geometry = rmpcpp::CartesianCameraGeometry;
   using distance_geometry = rmpcpp::DistanceGeometry;
@@ -547,8 +543,12 @@ void RMPPlanner::planTrajectory(){
     camera_policy.setMaxAcc(a_max_C);
 
     // fill the metric for the camera policy
-    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
-    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) / (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
+    double divider_u = pinhole_constants_.f_x * pinhole_constants_.f_x /
+                       (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) /
+                       (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
+    double divider_v = pinhole_constants_.f_y * pinhole_constants_.f_y /
+                       (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]) /
+                       (planning_uav_state_.pose.translation()[2] - cur_target_pos_[2]);
     A_camera(0, 0) = a_u_ / divider_u;
     A_camera(1, 1) = a_v_ / divider_v;
     camera_policy.setA(A_camera);
@@ -576,21 +576,11 @@ void RMPPlanner::planTrajectory(){
     if(cur_target_pos_[2] - uav_pos[2] < 0.3 && !target_passed_){
       target_passed_ = true;
     }
-
-    // publish acc field and state for analyzation purposes
-    double t_for_msg = time_of_last_detection_.toSec() + t;
-
-    this->publish_analyzation_msg(camera_policy.getAccField(), u_v, u_v_dot,
-                                  distance_policy.getAccField(), d, d_dot, t_for_msg);
   }
 
   // publish trajectory
   trajectory_msg.header.stamp = ros::Time::now();
   pub_traj_.publish(trajectory_msg);
-
-  // chrono_t2_ = std::chrono::high_resolution_clock::now();
-  // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(chrono_t2_ - chrono_t1_).count();
-  // std::cout << "Duration: " << duration << " microseconds" << std::endl;
 }
 
 void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_pos,
@@ -638,28 +628,6 @@ void RMPPlanner::create_traj_point(double t, Eigen::Matrix<double, 4, 1> traj_po
   trajectory_point_msg.time_from_start = ros::Duration(t);
   msg->points.push_back(trajectory_point_msg);
 }
-
-void RMPPlanner::publish_analyzation_msg(Eigen::Matrix<double, 2, 1> f_u_v,
-                                         Eigen::Matrix<double, 2, 1> u_v,
-                                         Eigen::Matrix<double, 2, 1> u_v_dot,
-                                         Eigen::Matrix<double, 1, 1> f_d,
-                                         Eigen::Matrix<double, 1, 1> d,
-                                         Eigen::Matrix<double, 1, 1> d_dot,
-                                         double t){
-  drogone_msgs_rmp::AccFieldWithState msg;
-  msg.f_u = f_u_v[0];
-  msg.f_v = f_u_v[1];
-  msg.f_d = f_d[0];
-  msg.x_u = u_v[0];
-  msg.x_v = u_v[1];
-  msg.x_d = d[0];
-  msg.x_dot_u = u_v_dot[0];
-  msg.x_dot_v = u_v_dot[1];
-  msg.x_dot_d = d_dot[0];
-  msg.header.stamp = ros::Time(t);
-  pub_analyzation_.publish(msg);
-}
-
 
 bool RMPPlanner::Land(){
   ROS_WARN_STREAM("MP ----- LAND");
