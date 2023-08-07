@@ -67,3 +67,5 @@ After Take Off the Gui should look like this:
 If nothing is inserted in the boxes at the right and "Change Starting Point" is pressed, the target jumps to a random point. However the starting point can also be changed to a desired position with the three boxes ito the right of the "Change Starting Point" Button. If this is changed, it has to be confirmed by pressing the button. If the position is set like this, a(n) (initial) flight direction of the target has to be defined as well. This can be done with the three boxes "velocity vector" at the upper right. 
 
 For a static try, the "Start Autonomous Flying" button can be pressed to start the carrier multicopter. For special flight manoeuvres the "linear path" or "random path" buttons can be pressed. In this case the carrier multicopter starts automatically. The "circular path" and "eight path" buttons should also work, but have not been tried yet. 
+
+Don't delete me pleaaase.
